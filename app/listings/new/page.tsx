@@ -4,12 +4,66 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 const EARBUD_MODELS = [
-  'Samsung Galaxy Buds2',
-  'Samsung Galaxy Buds2 Pro',
-  'Samsung Galaxy Buds FE',
+  // Apple
   'Apple AirPods Pro 2',
+  'Apple AirPods Pro 1',
   'Apple AirPods 3',
+  'Apple AirPods 2',
+  // Samsung
+  'Samsung Galaxy Buds2 Pro',
+  'Samsung Galaxy Buds2',
+  'Samsung Galaxy Buds FE',
+  'Samsung Galaxy Buds Live',
+  'Samsung Galaxy Buds Plus',
+  // Sony
   'Sony WF-1000XM5',
+  'Sony WF-1000XM4',
+  'Sony WF-C700N',
+  'Sony WF-C500',
+  // JBL
+  'JBL Tour Pro 2',
+  'JBL Live Pro 2',
+  'JBL Tune Flex',
+  'JBL Tune 230NC',
+  'JBL Wave Flex',
+  // Realme
+  'Realme Buds Air 5 Pro',
+  'Realme Buds Air 5',
+  'Realme Buds Air 3',
+  'Realme Buds T300',
+  'Realme Buds T100',
+  // OnePlus
+  'OnePlus Buds Pro 2',
+  'OnePlus Buds Pro',
+  'OnePlus Buds Z2',
+  // Xiaomi
+  'Xiaomi Redmi Buds 5 Pro',
+  'Xiaomi Redmi Buds 5',
+  'Xiaomi Redmi Buds 4 Pro',
+  'Xiaomi Buds 4',
+  // Oppo
+  'Oppo Enco X2',
+  'Oppo Enco Air 3 Pro',
+  'Oppo Enco Air 3',
+  'Oppo Enco Buds 2',
+  // Huawei
+  'Huawei FreeBuds Pro 3',
+  'Huawei FreeBuds Pro 2',
+  'Huawei FreeBuds 5i',
+  'Huawei FreeBuds 4i',
+  // Anker / Soundcore
+  'Soundcore Liberty 4',
+  'Soundcore Liberty 4 NC',
+  'Soundcore Life P3',
+  'Soundcore Space A40',
+  // Jabra
+  'Jabra Elite 10',
+  'Jabra Elite 8 Active',
+  'Jabra Elite 4',
+  // Bose
+  'Bose QuietComfort Earbuds 2',
+  'Bose QuietComfort Earbuds',
+  // Other
   'Other',
 ]
 
@@ -26,14 +80,58 @@ const OPPOSITE_MAP: Record<string, string[]> = {
 }
 
 const DEFAULT_MARKET_PRICES: Record<string, number> = {
-  'Samsung Galaxy Buds2': 25000,
-  'Samsung Galaxy Buds2 Pro': 35000,
-  'Samsung Galaxy Buds FE': 20000,
-  'Apple AirPods Pro 2': 80000,
+
+
+  'Apple AirPods Pro 2': 95000,
+  'Apple AirPods Pro 1': 65000,
   'Apple AirPods 3': 55000,
-  'Sony WF-1000XM5': 60000,
-  'Other': 15000,
+  'Apple AirPods 2': 35000,
+  'Samsung Galaxy Buds2 Pro': 45000,
+  'Samsung Galaxy Buds2': 28000,
+  'Samsung Galaxy Buds FE': 22000,
+  'Samsung Galaxy Buds Live': 20000,
+  'Samsung Galaxy Buds Plus': 18000,
+  'Sony WF-1000XM5': 70000,
+  'Sony WF-1000XM4': 55000,
+  'Sony WF-C700N': 32000,
+  'Sony WF-C500': 22000,
+  'JBL Tour Pro 2': 48000,
+  'JBL Live Pro 2': 35000,
+  'JBL Tune Flex': 18000,
+  'JBL Tune 230NC': 14000,
+  'JBL Wave Flex': 12000,
+  'Realme Buds Air 5 Pro': 18000,
+  'Realme Buds Air 5': 14000,
+  'Realme Buds Air 3': 10000,
+  'Realme Buds T300': 8000,
+  'Realme Buds T100': 5000,
+  'OnePlus Buds Pro 2': 28000,
+  'OnePlus Buds Pro': 20000,
+  'OnePlus Buds Z2': 12000,
+  'Xiaomi Redmi Buds 5 Pro': 16000,
+  'Xiaomi Redmi Buds 5': 12000,
+  'Xiaomi Redmi Buds 4 Pro': 14000,
+  'Xiaomi Buds 4': 18000,
+  'Oppo Enco X2': 32000,
+  'Oppo Enco Air 3 Pro': 18000,
+  'Oppo Enco Air 3': 12000,
+  'Oppo Enco Buds 2': 8000,
+  'Huawei FreeBuds Pro 3': 48000,
+  'Huawei FreeBuds Pro 2': 38000,
+  'Huawei FreeBuds 5i': 22000,
+  'Huawei FreeBuds 4i': 18000,
+  'Soundcore Liberty 4': 22000,
+  'Soundcore Liberty 4 NC': 18000,
+  'Soundcore Life P3': 12000,
+  'Soundcore Space A40': 16000,
+  'Jabra Elite 10': 55000,
+  'Jabra Elite 8 Active': 38000,
+  'Jabra Elite 4': 22000,
+  'Bose QuietComfort Earbuds 2': 75000,
+  'Bose QuietComfort Earbuds': 55000,
+  'Other': 10000,
 }
+
 
 async function getMarketPrice(model: string): Promise<number> {
   const { data } = await supabase.from('model_prices').select('market_price').eq('model', model).single()
