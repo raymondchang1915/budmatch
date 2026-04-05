@@ -12,7 +12,7 @@ export default function Navbar() {
             Browse
           </Link>
           <Link href="/listings/new" className="text-sm text-gray-500 hover:text-gray-900 transition">
-            How it works
+            Add a bud
           </Link>
         </div>
         <div className="flex items-center gap-3">
