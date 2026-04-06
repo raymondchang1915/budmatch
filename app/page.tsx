@@ -18,7 +18,7 @@ export default function Home() {
         </div>
 
         <h1 className="text-[80px] leading-[0.95] font-bold text-gray-900 mb-10 max-w-3xl tracking-tight">
-          The smarter way to fix your earbuds.
+          Im sorryy cutiee come to meee
         </h1>
 
         <p className="text-lg text-gray-500 max-w-lg mb-12 leading-relaxed">
