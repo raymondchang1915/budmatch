@@ -83,13 +83,13 @@ async function scoreEdge(a: Listing, b: Listing): Promise<number> {
   )
 }
 
-// ── Pricing engine ─────────────────────────────────────────────
+// ── Pricing engine (FINAL: Demand + Stable Profit) ────────────
 async function computePricing(
   listingA: Listing,
   listingB: Listing,
   model: string
 ) {
-  // get market price from model_prices or use asking prices
+  // ── 1. Market reference ─────────────────────────────────────
   const { data: mp } = await supabase
     .from('model_prices')
     .select('market_price')
@@ -99,31 +99,63 @@ async function computePricing(
   const marketPrice = mp?.market_price
     ?? ((listingA.asking_price ?? 0) + (listingB.asking_price ?? 0)) / 2
 
-  // component is roughly 30-50% of full device price
   const componentValue = marketPrice * 0.40
 
-  // platform pricing:
-  // buyer pays slightly below perceived market (good deal feeling)
-  // seller receives slightly above their asking (competitive feeling)
-  // platform keeps the margin
+  // ── 2. Asking prices fallback ───────────────────────────────
+  const askA = listingA.asking_price ?? componentValue * 0.85
+  const askB = listingB.asking_price ?? componentValue * 0.85
 
-  const sellerAskA = listingA.asking_price ?? componentValue * 0.85
-  const sellerAskB = listingB.asking_price ?? componentValue * 0.85
+  const fairPrice = (askA + askB) / 2
 
-  const platformFee = 200 // LKR flat fee per match
+  // ── 3. Demand signals ───────────────────────────────────────
+  const getDemand = async (component: string) => {
+    const { data } = await supabase
+      .from('demand_stats')
+      .select('need_count, have_count')
+      .eq('model', model)
+      .eq('component', component)
+      .single()
 
-  const buyerPriceA = Math.round(Math.min(sellerAskA * 1.08, componentValue * 0.95))
-  const buyerPriceB = Math.round(Math.min(sellerAskB * 1.08, componentValue * 0.95))
+    if (!data) return 0.5
+    const total = data.need_count + data.have_count
+    return total === 0 ? 0.5 : data.need_count / total
+  }
 
-  const sellerPayoutA = Math.round(buyerPriceA - platformFee)
-  const sellerPayoutB = Math.round(buyerPriceB - platformFee)
+  const demandA = await getDemand(listingA.has_component)
+  const demandB = await getDemand(listingB.has_component)
+
+  // ── 4. Surplus shift (controlled) ───────────────────────────
+  const rawShift = fairPrice * 0.06 * (demandA - demandB)
+
+  // clamp to avoid extreme pricing
+  const maxShift = fairPrice * 0.08
+  const shift = Math.max(-maxShift, Math.min(maxShift, rawShift))
+
+  // ── 5. Base transfer values ─────────────────────────────────
+  const transferA = fairPrice + shift
+  const transferB = fairPrice - shift
+
+  // ── 6. Platform margin (guaranteed profit) ──────────────────
+  const marginRate = 0.04 // 4%
+
+  // A buys B's component, B buys A's component
+  const buyerPriceA = Math.round(transferB * (1 + marginRate))
+  const sellerPayoutA = Math.round(transferA * (1 - marginRate))
+
+  const buyerPriceB = Math.round(transferA * (1 + marginRate))
+  const sellerPayoutB = Math.round(transferB * (1 - marginRate))
+
+  // ── 7. Platform revenue ─────────────────────────────────────
+  const platformFee =
+    (buyerPriceA - sellerPayoutA) +
+    (buyerPriceB - sellerPayoutB)
 
   return {
     buyer_price_a: buyerPriceA,
     buyer_price_b: buyerPriceB,
     seller_payout_a: sellerPayoutA,
     seller_payout_b: sellerPayoutB,
-    platform_fee: platformFee * 2,
+    platform_fee: platformFee,
     market_reference: Math.round(componentValue),
   }
 }
