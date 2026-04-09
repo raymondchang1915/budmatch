@@ -1,6 +1,5 @@
 'use client'
-
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
 const EARBUD_MODELS = [
@@ -201,6 +200,14 @@ export default function NewListing() {
     minPrice: number
     demandRatio: number
   } | null>(null)
+
+  useEffect(() => {
+  supabase.auth.getUser().then(({ data }) => {
+    if (data.user?.email) {
+      setForm(prev => ({ ...prev, user_email: data.user!.email! }))
+    }
+  })
+}, [])
   const [priceError, setPriceError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -239,73 +246,79 @@ export default function NewListing() {
     if (price > priceBounds.maxPrice) setPriceError(`Too high — max is LKR ${priceBounds.maxPrice.toLocaleString()}`)
     else if (price < priceBounds.minPrice) setPriceError(`Too low — min is LKR ${priceBounds.minPrice.toLocaleString()}`)
   }
+const handleSubmit = async () => {
+  if (priceError) return
+  setLoading(true)
+  setError('')
 
-  const handleSubmit = async () => {
-    if (priceError) return
-    setLoading(true)
-    setError('')
+  const askingPrice = parseFloat(form.asking_price)
+  if (form.model && askingPrice) await updateMarketPrice(form.model, askingPrice)
 
-    const askingPrice = parseFloat(form.asking_price)
-    if (form.model && askingPrice) await updateMarketPrice(form.model, askingPrice)
+  await supabase.from('demand_stats').upsert([{
+    model: form.model,
+    component: form.has_component,
+    have_count: 1,
+  }], { onConflict: 'model,component' })
 
-    await supabase.from('demand_stats').upsert([{
+  const { data: listing, error: insertError } = await supabase
+    .from('listings')
+    .insert([{
+      user_email: form.user_email,
       model: form.model,
-      component: form.has_component,
-      have_count: 1,
-    }], { onConflict: 'model,component' })
+      has_component: form.has_component,
+      needs_component: form.needs_component,
+      condition: form.condition,
+      location: form.location,
+      listing_type: form.listing_type,
+      asking_price: askingPrice || null,
+    }])
+    .select()
+    .single()
 
-    const { data: listing, error: insertError } = await supabase
-      .from('listings')
-      .insert([{
-        user_email: form.user_email,
-        model: form.model,
-        has_component: form.has_component,
-        needs_component: form.needs_component,
-        condition: form.condition,
-        location: form.location,
-        listing_type: form.listing_type,
-        asking_price: askingPrice || null,
-      }])
-      .select()
-      .single()
-
-    if (insertError) {
-      setError(insertError.message)
-      setLoading(false)
-      return
-    }
-
-    // auto match using graph logic
-    const { data: potentialMatches } = await supabase
-      .from('listings')
-      .select('*')
-      .eq('model', form.model)
-      .eq('has_component', form.needs_component)
-      .eq('needs_component', form.has_component)
-      .eq('matched', false)
-      .neq('user_email', form.user_email)
-
-    if (potentialMatches && potentialMatches.length > 0) {
-      // pick best match by condition similarity
-      const conditionScore = (c: string) =>
-        c === 'Working perfectly' ? 3 : c === 'Minor issues' ? 2 : 1
-      const best = potentialMatches.sort((a, b) =>
-        Math.abs(conditionScore(a.condition) - conditionScore(form.condition)) -
-        Math.abs(conditionScore(b.condition) - conditionScore(form.condition))
-      )[0]
-
-      await supabase.from('matches').insert([{
-        listing_a: listing.id,
-        listing_b: best.id,
-        status: 'pending',
-      }])
-      await supabase.from('listings').update({ matched: true }).eq('id', listing.id)
-      await supabase.from('listings').update({ matched: true }).eq('id', best.id)
-    }
-
-    setSuccess(true)
+  if (insertError) {
+    setError(insertError.message)
     setLoading(false)
+    return
   }
+
+  // trigger global matching engine for this model
+  await fetch('/api/match', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: form.model }),
+  })
+
+  // auto match using graph logic
+  const { data: potentialMatches } = await supabase
+    .from('listings')
+    .select('*')
+    .eq('model', form.model)
+    .eq('has_component', form.needs_component)
+    .eq('needs_component', form.has_component)
+    .eq('matched', false)
+    .neq('user_email', form.user_email)
+
+  if (potentialMatches && potentialMatches.length > 0) {
+    // pick best match by condition similarity
+    const conditionScore = (c: string) =>
+      c === 'Working perfectly' ? 3 : c === 'Minor issues' ? 2 : 1
+    const best = potentialMatches.sort((a, b) =>
+      Math.abs(conditionScore(a.condition) - conditionScore(form.condition)) -
+      Math.abs(conditionScore(b.condition) - conditionScore(form.condition))
+    )[0]
+
+    await supabase.from('matches').insert([{
+      listing_a: listing.id,
+      listing_b: best.id,
+      status: 'pending',
+    }])
+    await supabase.from('listings').update({ matched: true }).eq('id', listing.id)
+    await supabase.from('listings').update({ matched: true }).eq('id', best.id)
+  }
+
+  setSuccess(true)
+  setLoading(false)
+}
 
   const inputClass = "w-full bg-white border border-gray-200 rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 shadow-sm"
   const selectClass = "w-full bg-white border border-gray-200 rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 shadow-sm appearance-none"

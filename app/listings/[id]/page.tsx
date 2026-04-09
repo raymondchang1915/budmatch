@@ -22,6 +22,13 @@ type Match = {
   listing_a: string
   listing_b: string
   status: string
+  score: number
+  buyer_price_a: number
+  buyer_price_b: number
+  seller_payout_a: number
+  seller_payout_b: number
+  platform_fee: number
+  market_reference: number
 }
 
 type Message = {
@@ -44,14 +51,20 @@ export default function ListingPage() {
 
   useEffect(() => {
     fetchListing()
+    // auto fill email if logged in
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.email) {
+        setMyEmail(data.user.email)
+        setEmailSaved(true)
+      }
+    })
   }, [id])
 
   useEffect(() => {
     if (match) {
       fetchMessages()
-      // realtime subscription
       const channel = supabase
-        .channel('messages')
+        .channel(`messages-${match.id}`)
         .on('postgres_changes', {
           event: 'INSERT',
           schema: 'public',
@@ -70,8 +83,13 @@ export default function ListingPage() {
   }, [messages])
 
   const fetchListing = async () => {
-    const { data } = await supabase.from('listings').select('*').eq('id', id).single()
+    const { data } = await supabase
+      .from('listings')
+      .select('*')
+      .eq('id', id)
+      .single()
     setListing(data)
+
     if (data?.matched) {
       const { data: matchData } = await supabase
         .from('matches')
@@ -105,78 +123,147 @@ export default function ListingPage() {
   }
 
   if (!listing) return (
-    <main className="min-h-screen flex items-center justify-center">
+    <main className="min-h-screen bg-[#f5f5f0] flex items-center justify-center">
       <p className="text-gray-400">Loading...</p>
     </main>
   )
 
+  const myPrice = match
+    ? listing.id === match.listing_a
+      ? match.buyer_price_a
+      : match.buyer_price_b
+    : null
+
+  const mySavings = match?.market_reference && myPrice
+    ? match.market_reference - myPrice
+    : null
+
   return (
-    <main className="min-h-screen bg-gray-50 py-10 px-4">
-      <div className="max-w-xl mx-auto">
+    <main className="min-h-screen bg-[#f5f5f0] relative">
+      <div className="absolute inset-0 pointer-events-none" style={{
+        backgroundImage: `radial-gradient(circle, #00000012 1px, transparent 1px)`,
+        backgroundSize: '32px 32px',
+      }} />
+
+      <div className="relative max-w-xl mx-auto px-6 py-16">
 
         {/* Back */}
-        <a href="/browse" className="text-sm text-gray-400 hover:text-black mb-6 inline-block">← Back to listings</a>
+        <a href="/browse"
+          className="text-sm text-gray-400 hover:text-black mb-8 inline-block transition">
+          ← Back to listings
+        </a>
 
         {/* Listing card */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-6 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-4 shadow-sm">
           <div className="flex items-start justify-between mb-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{listing.model}</h1>
-              <p className="text-gray-400 text-sm mt-1">📍 {listing.location || 'Location not set'}</p>
+              <p className="text-gray-400 text-sm mt-1">
+                📍 {listing.location || 'Location not set'}
+              </p>
             </div>
             {listing.asking_price && (
-              <span className="bg-black text-white px-4 py-1.5 rounded-xl font-medium">
+              <span className="bg-gray-900 text-white px-4 py-1.5 rounded-xl font-medium">
                 LKR {listing.asking_price.toLocaleString()}
               </span>
             )}
           </div>
 
-          <div className="flex gap-3 mb-4">
-            <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm">
+          <div className="flex gap-3 mb-4 items-center">
+            <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm">
               <p className="text-gray-400 text-xs">Has</p>
               <p className="font-semibold text-gray-900">{listing.has_component}</p>
             </div>
-            <div className="flex items-center text-gray-300">→</div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm">
+            <span className="text-gray-300">→</span>
+            <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm">
               <p className="text-gray-400 text-xs">Needs</p>
               <p className="font-semibold text-gray-900">{listing.needs_component}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-              listing.condition === 'Working perfectly' ? 'bg-green-100 text-green-700' :
-              listing.condition === 'Minor issues' ? 'bg-yellow-100 text-yellow-700' :
-              'bg-gray-100 text-gray-500'
-            }`}>{listing.condition}</span>
-            <span className="text-gray-300">•</span>
-            <span className="capitalize">{listing.listing_type}</span>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+              listing.condition === 'Working perfectly'
+                ? 'bg-green-100 text-green-700'
+                : listing.condition === 'Minor issues'
+                ? 'bg-yellow-100 text-yellow-700'
+                : 'bg-gray-100 text-gray-500'
+            }`}>
+              {listing.condition}
+            </span>
+            <span className="text-gray-300 text-xs">•</span>
+            <span className="text-xs text-gray-400 capitalize">{listing.listing_type}</span>
           </div>
         </div>
+
+        {/* Pricing card — only shows when matched */}
+        {listing.matched && match && myPrice && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="font-semibold text-gray-900">BudMatch pricing</h2>
+              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                Set by platform
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="bg-gray-50 rounded-xl p-4 text-center">
+                <p className="text-xs text-gray-400 mb-1">You pay</p>
+                <p className="text-lg font-bold text-gray-900">
+                  LKR {myPrice.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-4 text-center">
+                <p className="text-xs text-gray-400 mb-1">Market rate</p>
+                <p className="text-lg font-bold text-gray-400">
+                  LKR {match.market_reference?.toLocaleString() ?? '—'}
+                </p>
+              </div>
+              <div className="bg-green-50 rounded-xl p-4 text-center">
+                <p className="text-xs text-green-600 mb-1">You save</p>
+                <p className="text-lg font-bold text-green-700">
+                  {mySavings && mySavings > 0
+                    ? `LKR ${mySavings.toLocaleString()}`
+                    : 'Great deal'}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+              <p className="text-xs text-amber-700 font-medium">
+                ⚡ Price is locked in by BudMatch. Use the chat below to confirm the swap details.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Chat section */}
         {listing.matched && match ? (
           <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-gray-900">Chat</h2>
-              <p className="text-xs text-gray-400 mt-0.5">You've been matched! Negotiate a deal here.</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                You've been matched! Confirm swap details here.
+              </p>
             </div>
 
-            {/* Email gate */}
+            {/* Email gate — skipped if logged in */}
             {!emailSaved ? (
               <div className="p-5">
-                <p className="text-sm text-gray-500 mb-3">Enter your email to join the chat:</p>
+                <p className="text-sm text-gray-500 mb-3">
+                  Enter your email to join the chat:
+                </p>
                 <div className="flex gap-2">
                   <input
                     type="email"
                     placeholder="your@email.com"
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+                    className="flex-1 border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
                     value={myEmail}
                     onChange={e => setMyEmail(e.target.value)}
                   />
                   <button
                     onClick={() => { if (myEmail) setEmailSaved(true) }}
-                    className="bg-black text-white px-4 py-2 rounded-lg text-sm"
+                    className="bg-gray-900 text-white px-5 py-2 rounded-full text-sm hover:bg-black transition"
                   >
                     Join
                   </button>
@@ -185,23 +272,34 @@ export default function ListingPage() {
             ) : (
               <>
                 {/* Messages */}
-                <div className="h-72 overflow-y-auto p-5 flex flex-col gap-3">
+                <div className="h-72 overflow-y-auto p-5 flex flex-col gap-3 bg-gray-50">
                   {messages.length === 0 && (
-                    <p className="text-center text-gray-300 text-sm mt-8">No messages yet. Say hi!</p>
+                    <p className="text-center text-gray-300 text-sm mt-8">
+                      No messages yet. Say hi!
+                    </p>
                   )}
                   {messages.map(msg => (
                     <div
                       key={msg.id}
-                      className={`flex ${msg.sender_email === myEmail ? 'justify-end' : 'justify-start'}`}
+                      className={`flex ${msg.sender_email === myEmail
+                        ? 'justify-end'
+                        : 'justify-start'
+                      }`}
                     >
-                      <div className={`max-w-xs rounded-2xl px-4 py-2 text-sm ${
+                      <div className={`max-w-xs rounded-2xl px-4 py-2.5 text-sm ${
                         msg.sender_email === myEmail
-                          ? 'bg-black text-white rounded-br-sm'
-                          : 'bg-gray-100 text-gray-800 rounded-bl-sm'
+                          ? 'bg-gray-900 text-white rounded-br-sm'
+                          : 'bg-white text-gray-800 rounded-bl-sm border border-gray-200'
                       }`}>
                         <p>{msg.content}</p>
-                        <p className={`text-xs mt-1 ${msg.sender_email === myEmail ? 'text-gray-400' : 'text-gray-400'}`}>
-                          {msg.sender_email === myEmail ? 'You' : msg.sender_email.split('@')[0]}
+                        <p className={`text-xs mt-1 ${
+                          msg.sender_email === myEmail
+                            ? 'text-gray-400'
+                            : 'text-gray-400'
+                        }`}>
+                          {msg.sender_email === myEmail
+                            ? 'You'
+                            : msg.sender_email.split('@')[0]}
                         </p>
                       </div>
                     </div>
@@ -209,12 +307,12 @@ export default function ListingPage() {
                   <div ref={bottomRef} />
                 </div>
 
-                {/* Input */}
-                <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
+                {/* Message input */}
+                <div className="px-4 py-3 border-t border-gray-100 flex gap-2 bg-white">
                   <input
                     type="text"
                     placeholder="Type a message..."
-                    className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+                    className="flex-1 border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
                     value={newMessage}
                     onChange={e => setNewMessage(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') sendMessage() }}
@@ -222,7 +320,7 @@ export default function ListingPage() {
                   <button
                     onClick={sendMessage}
                     disabled={sending || !newMessage.trim()}
-                    className="bg-black text-white px-4 py-2 rounded-xl text-sm disabled:opacity-40 transition"
+                    className="bg-gray-900 text-white px-5 py-2 rounded-full text-sm disabled:opacity-40 hover:bg-black transition"
                   >
                     Send
                   </button>
@@ -231,10 +329,12 @@ export default function ListingPage() {
             )}
           </div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center shadow-sm">
             <p className="text-4xl mb-3">🔍</p>
-            <p className="font-medium text-gray-700 mb-1">Looking for a match</p>
-            <p className="text-gray-400 text-sm">Chat will unlock once this listing is matched with another user.</p>
+            <p className="font-semibold text-gray-700 mb-1">Looking for a match</p>
+            <p className="text-gray-400 text-sm">
+              Chat unlocks once this listing is matched. We'll notify you by email.
+            </p>
           </div>
         )}
 
