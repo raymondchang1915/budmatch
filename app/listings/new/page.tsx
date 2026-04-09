@@ -166,9 +166,10 @@ async function updateMarketPrice(model: string, userPrice: number) {
 }
 
 async function getDynamicPriceBounds(model: string, component: string, marketPrice: number) {
-  const { data } = await supabase.from('demand_stats').select('*').eq('model', model).eq('component', component).single()
-  const needCount = data?.need_count ?? 0
-  const haveCount = data?.have_count ?? 0
+  const { data } = await supabase.from('demand_stats').select('*').eq('model', model).eq('component', component)
+  const row = data?.[0]
+  const needCount = row?.need_count ?? 0
+  const haveCount = row?.have_count ?? 0
   const total = needCount + haveCount
   const demandRatio = total === 0 ? 0.5 : needCount / total
   const minPct = 0.10
