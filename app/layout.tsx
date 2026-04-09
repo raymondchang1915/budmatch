@@ -1,10 +1,16 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import Navbar from './components/Navbar'
 
 export const metadata: Metadata = {
   title: 'BudMatch — Match your missing earbud',
   description: 'Find someone who has what you need and needs what you have.',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
