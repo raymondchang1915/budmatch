@@ -260,7 +260,7 @@ const handleSubmit = async () => {
     have_count: 1,
   }], { onConflict: 'model,component' })
 
-  const { data: listing, error: insertError } = await supabase
+  const { error: insertError } = await supabase
     .from('listings')
     .insert([{
       user_email: form.user_email,
@@ -272,8 +272,6 @@ const handleSubmit = async () => {
       listing_type: form.listing_type,
       asking_price: askingPrice || null,
     }])
-    .select()
-    .single()
 
   if (insertError) {
     setError(insertError.message)
@@ -281,40 +279,12 @@ const handleSubmit = async () => {
     return
   }
 
-  // trigger global matching engine for this model
+  // pricing-aware matching engine handles everything
   await fetch('/api/match', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: form.model }),
   })
-
-  // auto match using graph logic
-  const { data: potentialMatches } = await supabase
-    .from('listings')
-    .select('*')
-    .eq('model', form.model)
-    .eq('has_component', form.needs_component)
-    .eq('needs_component', form.has_component)
-    .eq('matched', false)
-    .neq('user_email', form.user_email)
-
-  if (potentialMatches && potentialMatches.length > 0) {
-    // pick best match by condition similarity
-    const conditionScore = (c: string) =>
-      c === 'Working perfectly' ? 3 : c === 'Minor issues' ? 2 : 1
-    const best = potentialMatches.sort((a, b) =>
-      Math.abs(conditionScore(a.condition) - conditionScore(form.condition)) -
-      Math.abs(conditionScore(b.condition) - conditionScore(form.condition))
-    )[0]
-
-    await supabase.from('matches').insert([{
-      listing_a: listing.id,
-      listing_b: best.id,
-      status: 'pending',
-    }])
-    await supabase.from('listings').update({ matched: true }).eq('id', listing.id)
-    await supabase.from('listings').update({ matched: true }).eq('id', best.id)
-  }
 
   setSuccess(true)
   setLoading(false)
