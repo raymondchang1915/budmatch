@@ -37,6 +37,7 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-8">
           <Link href="/browse" className="text-sm text-gray-500 hover:text-gray-900 transition">Browse</Link>
           <Link href="/listings/new" className="text-sm text-gray-500 hover:text-gray-900 transition">Add a bud</Link>
+          <Link href="/shop" className="text-sm text-gray-500 hover:text-gray-900 transition">For shops</Link>
         </div>
 
         <div className="hidden md:flex items-center gap-3">
@@ -83,6 +84,10 @@ export default function Navbar() {
           <Link href="/listings/new" onClick={() => setMenuOpen(false)}
             className="text-sm text-gray-700 px-4 py-3 rounded-xl hover:bg-gray-50 transition">
             Add a bud
+          </Link>
+          <Link href="/shop" onClick={() => setMenuOpen(false)}
+            className="text-sm text-gray-700 px-4 py-3 rounded-xl hover:bg-gray-50 transition">
+            For shops
           </Link>
           {user ? (
             <>
