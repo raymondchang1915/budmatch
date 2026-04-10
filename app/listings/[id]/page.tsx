@@ -370,7 +370,7 @@ export default function ListingPage() {
                         📦 Arrange delivery
                       </p>
                       <div className="flex gap-2">
-                        
+                        <a
                           href="https://pickme.lk"
                           target="_blank"
                           rel="noopener noreferrer"
@@ -378,7 +378,7 @@ export default function ListingPage() {
                         >
                           PickMe Delivery
                         </a>
-                        
+                        <a
                           href="https://uber.com"
                           target="_blank"
                           rel="noopener noreferrer"
