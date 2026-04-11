@@ -8,8 +8,6 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   const { match_id, role, direction } = await req.json()
-  // role = 'buyer' | 'seller'
-  // direction = 'up' | 'down'
 
   const { data: match } = await supabase
     .from('matches')
@@ -18,26 +16,29 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (!match) return NextResponse.json({ error: 'Match not found' }, { status: 404 })
+  if (match.negotiation_status === 'agreed') {
+    return NextResponse.json({ error: 'Already agreed' }, { status: 400 })
+  }
 
   const step = 100
   const field = role === 'buyer' ? 'buyer_offer' : 'seller_offer'
-  const currentOffer = match[field] ?? match.anchor_price
+  const current = match[field] ?? match.anchor_price
+
   const newOffer = direction === 'up'
-    ? Math.min(currentOffer + step, match.ladder_max)
-    : Math.max(currentOffer - step, match.ladder_min)
+    ? Math.min(current + step, match.ladder_max)
+    : Math.max(current - step, match.ladder_min)
 
   await supabase
     .from('matches')
     .update({ [field]: newOffer })
     .eq('id', match_id)
 
-  // check if buyer and seller offers overlap
   const buyerOffer = role === 'buyer' ? newOffer : (match.buyer_offer ?? match.anchor_price)
   const sellerOffer = role === 'seller' ? newOffer : (match.seller_offer ?? match.anchor_price)
 
+  // auto clear when offers overlap
   if (buyerOffer >= sellerOffer) {
-    // auto-clear at midpoint
-    const agreedPrice = Math.round((buyerOffer + sellerOffer) / 2)
+    const agreedPrice = Math.round((buyerOffer + sellerOffer) / 2 / 100) * 100
     await supabase
       .from('matches')
       .update({
@@ -50,5 +51,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ agreed: true, agreed_price: agreedPrice })
   }
 
-  return NextResponse.json({ agreed: false, buyer_offer: buyerOffer, seller_offer: sellerOffer })
+  return NextResponse.json({
+    agreed: false,
+    buyer_offer: buyerOffer,
+    seller_offer: sellerOffer,
+  })
 }
