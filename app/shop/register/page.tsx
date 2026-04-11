@@ -29,7 +29,10 @@ export default function ShopRegister() {
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5 ml-1"
 
   const captureGPS = () => {
-    if (!navigator.geolocation) { setGpsStatus('error'); return }
+    if (!navigator.geolocation) {
+      setGpsStatus('error')
+      return
+    }
     setGpsStatus('loading')
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -37,15 +40,22 @@ export default function ShopRegister() {
         const lng = pos.coords.longitude
         setCoords({ lat, lng })
         try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+          )
           const data = await res.json()
           const city = data.address?.city || data.address?.town || data.address?.suburb || ''
           const country = data.address?.country || ''
           setLocationLabel(`${city}, ${country}`.trim().replace(/^,\s*/, ''))
-        } catch { /* coords still captured */ }
+        } catch {
+          setLocationLabel('Location captured')
+        }
         setGpsStatus('done')
       },
-      () => setGpsStatus('error'),
+      (err) => {
+        console.error('GPS error:', err)
+        setGpsStatus('error')
+      },
       { enableHighAccuracy: true, timeout: 10000 }
     )
   }
@@ -107,44 +117,53 @@ export default function ShopRegister() {
         <p className="text-gray-400 mb-10">Earn 10% commission on every match you refer.</p>
 
         <div className="flex flex-col gap-5">
+
           <div>
             <label className={labelClass}>Shop name</label>
             <input type="text" placeholder="e.g. Tech Hub Colombo" className={inputClass}
               value={form.shop_name} onChange={e => setForm({ ...form, shop_name: e.target.value })} />
           </div>
+
           <div>
             <label className={labelClass}>Owner name</label>
             <input type="text" placeholder="Your full name" className={inputClass}
               value={form.owner_name} onChange={e => setForm({ ...form, owner_name: e.target.value })} />
           </div>
+
           <div>
             <label className={labelClass}>Phone</label>
             <input type="tel" placeholder="+94 77 000 0000" className={inputClass}
               value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
           </div>
+
           <div>
             <label className={labelClass}>Email</label>
             <input type="email" placeholder="shop@example.com" className={inputClass}
               value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
           </div>
 
-          {/* GPS — required, no manual fallback */}
+          {/* GPS location */}
           <div>
             <label className={labelClass}>Shop location <span className="text-red-400">*</span></label>
             <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-3">
               <p className="text-xs text-gray-500">
-                We pin your shop using GPS so customers know where you are — and so we can verify you're real. Location access is required.
+                We pin your shop using GPS so customers know where you are and so we can verify you're real. Location access is required.
               </p>
 
               {gpsStatus === 'idle' && (
-                <button onClick={captureGPS}
-                  className="w-full border border-gray-200 text-gray-700 py-3 rounded-full text-sm font-medium hover:border-gray-900 transition flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={captureGPS}
+                  className="w-full border border-gray-200 text-gray-700 py-3 rounded-full text-sm font-medium hover:border-gray-900 transition flex items-center justify-center gap-2"
+                >
                   📍 Capture my location
                 </button>
               )}
 
               {gpsStatus === 'loading' && (
-                <div className="text-center text-sm text-gray-400 py-2 animate-pulse">Getting your location...</div>
+                <div className="text-center text-sm text-gray-400 py-2 animate-pulse">
+                  Getting your location...
+                </div>
               )}
 
               {gpsStatus === 'done' && coords && (
@@ -156,7 +175,11 @@ export default function ShopRegister() {
                   <p className="text-xs text-gray-400 ml-1">
                     {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
                   </p>
-                  <button onClick={captureGPS} className="text-xs text-gray-400 hover:text-gray-700 transition ml-1">
+                  <button
+                    type="button"
+                    onClick={captureGPS}
+                    className="text-xs text-gray-400 hover:text-gray-700 transition ml-1"
+                  >
                     Recapture
                   </button>
                 </div>
@@ -165,10 +188,13 @@ export default function ShopRegister() {
               {gpsStatus === 'error' && (
                 <div className="space-y-2">
                   <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
-                    Location access denied. Please enable it in your browser settings.
+                    Location access denied. Please allow location access in your browser and try again.
                   </p>
-                  <button onClick={captureGPS}
-                    className="w-full border border-gray-200 text-gray-700 py-3 rounded-full text-sm hover:border-gray-900 transition">
+                  <button
+                    type="button"
+                    onClick={captureGPS}
+                    className="w-full border border-gray-200 text-gray-700 py-3 rounded-full text-sm hover:border-gray-900 transition"
+                  >
                     Try again
                   </button>
                 </div>
@@ -194,6 +220,7 @@ export default function ShopRegister() {
                 <p className="text-xs text-gray-400 mt-0.5">Can customers drop buds off at your shop?</p>
               </div>
               <button
+                type="button"
                 onClick={() => setForm({ ...form, is_dropoff: !form.is_dropoff })}
                 className={`relative w-12 h-6 rounded-full transition-colors ${form.is_dropoff ? 'bg-gray-900' : 'bg-gray-200'}`}
               >
@@ -214,12 +241,22 @@ export default function ShopRegister() {
           {error && <p className="text-red-500 text-sm ml-1">{error}</p>}
 
           <button
+            type="button"
             onClick={handleSubmit}
-            disabled={loading || !form.shop_name || !form.owner_name || !form.phone || !form.email || !form.registration_number || gpsStatus !== 'done'}
+            disabled={
+              loading ||
+              !form.shop_name ||
+              !form.owner_name ||
+              !form.phone ||
+              !form.email ||
+              !form.registration_number ||
+              gpsStatus !== 'done'
+            }
             className="bg-gray-900 text-white py-3.5 rounded-full font-medium hover:bg-black transition disabled:opacity-40 text-sm"
           >
             {loading ? 'Submitting...' : 'Apply now →'}
           </button>
+
         </div>
       </div>
     </main>
