@@ -1,20 +1,21 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { useParams } from 'next/navigation'
 
 type Listing = {
   id: string
-  user_email: string
   model: string
   has_component: string
   needs_component: string
   condition: string
   location: string
+  user_email: string
   asking_price: number | null
   matched: boolean
-  listing_type: string
+  created_at: string
+  shop_code: string | null
 }
 
 type Match = {
@@ -22,147 +23,216 @@ type Match = {
   listing_a: string
   listing_b: string
   status: string
-  score: number
   anchor_price: number
-  buyer_price_a: number
-  buyer_price_b: number
-  seller_payout_a: number
-  seller_payout_b: number
-  platform_fee: number
   market_reference: number
   typical_outside_sale: number
   ladder_min: number
   ladder_max: number
   buyer_offer: number
   seller_offer: number
-  agreed_price: number
+  agreed_price: number | null
   negotiation_status: string
+  buyer_paid: boolean
+  seller_paid: boolean
 }
 
 type Message = {
   id: string
+  created_at: string
+  match_id: string
   sender_email: string
   content: string
-  created_at: string
 }
 
-export default function ListingPage() {
-  const { id } = useParams()
+export default function ListingDetail() {
+  const { id } = useParams<{ id: string }>()
+  const router = useRouter()
+
   const [listing, setListing] = useState<Listing | null>(null)
   const [match, setMatch] = useState<Match | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
-  const [myEmail, setMyEmail] = useState('')
-  const [myRole, setMyRole] = useState<'buyer' | 'seller' | null>(null)
+  const [currentUser, setCurrentUser] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
-  const [emailSaved, setEmailSaved] = useState(false)
   const [sending, setSending] = useState(false)
   const [negotiating, setNegotiating] = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const [paying, setPaying] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [paymentStatus, setPaymentStatus] = useState<'success' | 'cancelled' | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const isListingOwner = listing?.user_email === currentUser
+  const userRole = isListingOwner ? 'seller' : 'buyer'
+  const chatUnlocked = match?.negotiation_status === 'agreed'
+  const bothPaid = match?.status === 'paid'
+  const userHasPaid = match
+    ? (userRole === 'buyer' ? match.buyer_paid : match.seller_paid)
+    : false
 
   useEffect(() => {
-    fetchListing()
+    // Check for payment return params in URL
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('payment') === 'success') setPaymentStatus('success')
+    if (params.get('payment') === 'cancelled') setPaymentStatus('cancelled')
+
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user?.email) {
-        setMyEmail(data.user.email)
-        setEmailSaved(true)
-      }
+      setCurrentUser(data.user?.email ?? null)
     })
+  }, [])
+
+  useEffect(() => {
+    if (!id) return
+    loadData()
   }, [id])
 
   useEffect(() => {
-    if (match && myEmail) {
-      const role = listing?.id === match.listing_a ? 'buyer' : 'seller'
-      setMyRole(role)
-    }
-  }, [match, myEmail])
+    if (!match?.id) return
+    loadMessages()
 
-  useEffect(() => {
-    if (match?.negotiation_status === 'agreed') {
-      fetchMessages()
-      const channel = supabase
-        .channel(`messages-${match.id}`)
-        .on('postgres_changes', {
+    const channel = supabase
+      .channel(`messages:${match.id}`)
+      .on(
+        'postgres_changes',
+        {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
           filter: `match_id=eq.${match.id}`,
-        }, payload => {
-          setMessages(prev => [...prev, payload.new as Message])
-        })
-        .subscribe()
-      return () => { supabase.removeChannel(channel) }
-    }
-  }, [match?.negotiation_status])
+        },
+        (payload) => {
+          setMessages((prev) => [...prev, payload.new as Message])
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [match?.id])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const fetchListing = async () => {
-    const { data } = await supabase
-      .from('listings').select('*').eq('id', id).single()
-    setListing(data)
-    if (data?.matched) {
-      const { data: matchData } = await supabase
-        .from('matches').select('*')
-        .or(`listing_a.eq.${id},listing_b.eq.${id}`)
-        .single()
-      setMatch(matchData)
-    }
+  async function loadData() {
+    const { data: listingData } = await supabase
+      .from('listings')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (!listingData) { setLoading(false); return }
+    setListing(listingData)
+
+    const { data: matchData } = await supabase
+      .from('matches')
+      .select('*')
+      .or(`listing_a.eq.${id},listing_b.eq.${id}`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (matchData) setMatch(matchData)
+    setLoading(false)
   }
 
-  const fetchMessages = async () => {
-    if (!match) return
+  async function loadMessages() {
+    if (!match?.id) return
     const { data } = await supabase
-      .from('messages').select('*')
+      .from('messages')
+      .select('*')
       .eq('match_id', match.id)
       .order('created_at', { ascending: true })
     setMessages(data ?? [])
   }
 
-  const negotiate = async (direction: 'up' | 'down') => {
-    if (!match || !myRole) return
+  async function handleNegotiate(direction: 'up' | 'down') {
+    if (!match || !currentUser) return
     setNegotiating(true)
-    const res = await fetch('/api/negotiate', {
+
+    await fetch('/api/negotiate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ match_id: match.id, role: myRole, direction }),
+      body: JSON.stringify({ match_id: match.id, role: userRole, direction }),
     })
-    const result = await res.json()
-    // refresh match data
-    const { data: updatedMatch } = await supabase
-      .from('matches').select('*').eq('id', match.id).single()
-    setMatch(updatedMatch)
+
+    const { data: freshMatch } = await supabase
+      .from('matches')
+      .select('*')
+      .eq('id', match.id)
+      .single()
+
+    if (freshMatch) setMatch(freshMatch)
     setNegotiating(false)
   }
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !myEmail || !match) return
+  async function handlePayment() {
+    if (!currentUser || !match) return
+    setPaying(true)
+
+    const res = await fetch('/api/payhere', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        match_id: match.id,
+        payer_email: currentUser,
+        role: userRole,
+      }),
+    })
+
+    const { checkout_url, params, error } = await res.json()
+    if (error) { setPaying(false); alert(error); return }
+
+    // PayHere requires a form POST — can't use fetch or redirect
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = checkout_url
+    Object.entries(params).forEach(([key, value]) => {
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = key
+      input.value = value as string
+      form.appendChild(input)
+    })
+    document.body.appendChild(form)
+    form.submit()
+  }
+
+  async function sendMessage() {
+    if (!newMessage.trim() || !match?.id || !currentUser) return
     setSending(true)
     await supabase.from('messages').insert([{
       match_id: match.id,
-      sender_email: myEmail,
+      sender_email: currentUser,
       content: newMessage.trim(),
     }])
     setNewMessage('')
     setSending(false)
   }
 
-  if (!listing) return (
-    <main className="min-h-screen bg-[#f5f5f0] flex items-center justify-center">
-      <p className="text-gray-400">Loading...</p>
-    </main>
-  )
+  // ─── Loading ────────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#f5f5f0] flex items-center justify-center">
+        <p className="text-gray-400 text-sm animate-pulse">Loading...</p>
+      </main>
+    )
+  }
 
-  const isBuyer = listing.id === match?.listing_a
-  const myOffer = isBuyer ? match?.buyer_offer : match?.seller_offer
-  const theirOffer = isBuyer ? match?.seller_offer : match?.buyer_offer
-  const myPayout = isBuyer ? match?.buyer_price_a : match?.seller_payout_b
-  const savings = match?.market_reference && myOffer
-    ? match.market_reference - myOffer : null
-  const extraEarned = match?.typical_outside_sale && myOffer
-    ? myOffer - match.typical_outside_sale : null
+  if (!listing) {
+    return (
+      <main className="min-h-screen bg-[#f5f5f0] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500 mb-4">Listing not found.</p>
+          <a href="/browse" className="text-sm text-gray-900 underline">Back to browse</a>
+        </div>
+      </main>
+    )
+  }
 
+  const conditionColor =
+    listing.condition === 'Working perfectly' ? 'text-green-600 bg-green-50 border-green-200' :
+    listing.condition === 'Minor issues'      ? 'text-amber-600 bg-amber-50 border-amber-200' :
+                                                'text-gray-500 bg-gray-100 border-gray-200'
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <main className="min-h-screen bg-[#f5f5f0] relative">
       <div className="absolute inset-0 pointer-events-none" style={{
@@ -170,281 +240,335 @@ export default function ListingPage() {
         backgroundSize: '32px 32px',
       }} />
 
-      <div className="relative max-w-xl mx-auto px-6 py-16">
-        <a href="/browse" className="text-sm text-gray-400 hover:text-black mb-8 inline-block">
-          ← Back to listings
-        </a>
+      <div className="relative max-w-2xl mx-auto px-6 py-16 space-y-5">
 
-        {/* Listing card */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-4 shadow-sm">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{listing.model}</h1>
-              <p className="text-gray-400 text-sm mt-1">📍 {listing.location || 'Location not set'}</p>
-            </div>
-            {listing.asking_price && (
-              <span className="bg-gray-900 text-white px-4 py-1.5 rounded-xl font-medium">
-                LKR {listing.asking_price.toLocaleString()}
-              </span>
-            )}
-          </div>
-          <div className="flex gap-3 mb-4 items-center">
-            <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm">
-              <p className="text-gray-400 text-xs">Has</p>
-              <p className="font-semibold text-gray-900">{listing.has_component}</p>
-            </div>
-            <span className="text-gray-300">→</span>
-            <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm">
-              <p className="text-gray-400 text-xs">Needs</p>
-              <p className="font-semibold text-gray-900">{listing.needs_component}</p>
-            </div>
-          </div>
-          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-            listing.condition === 'Working perfectly' ? 'bg-green-100 text-green-700' :
-            listing.condition === 'Minor issues' ? 'bg-yellow-100 text-yellow-700' :
-            'bg-gray-100 text-gray-500'
-          }`}>{listing.condition}</span>
-        </div>
+        {/* Back */}
+        <button
+          onClick={() => router.back()}
+          className="text-sm text-gray-400 hover:text-gray-700 transition flex items-center gap-1.5"
+        >
+          ← Back
+        </button>
 
-        {/* Matched state */}
-        {listing.matched && match ? (
-          <>
-            {/* Dual perception pricing card */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-4 shadow-sm">
-              <h2 className="font-semibold text-gray-900 mb-1">Your deal</h2>
-              <p className="text-xs text-gray-400 mb-4">
-                Prices set by BudMatch based on live market data
-              </p>
-
-              {isBuyer ? (
-                // BUYER VIEW — emphasize savings
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  <div className="bg-gray-50 rounded-xl p-4 text-center">
-                    <p className="text-xs text-gray-400 mb-1">Market rate</p>
-                    <p className="text-base font-bold text-gray-400 line-through">
-                      LKR {match.market_reference?.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="bg-gray-900 rounded-xl p-4 text-center">
-                    <p className="text-xs text-gray-300 mb-1">You pay</p>
-                    <p className="text-base font-bold text-white">
-                      LKR {myOffer?.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="bg-green-50 rounded-xl p-4 text-center">
-                    <p className="text-xs text-green-600 mb-1">You save</p>
-                    <p className="text-base font-bold text-green-700">
-                      {savings && savings > 0 ? `LKR ${savings.toLocaleString()}` : '✓'}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                // SELLER VIEW — emphasize extra earnings
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  <div className="bg-gray-50 rounded-xl p-4 text-center">
-                    <p className="text-xs text-gray-400 mb-1">Typical sale</p>
-                    <p className="text-base font-bold text-gray-400 line-through">
-                      LKR {match.typical_outside_sale?.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="bg-gray-900 rounded-xl p-4 text-center">
-                    <p className="text-xs text-gray-300 mb-1">You receive</p>
-                    <p className="text-base font-bold text-white">
-                      LKR {myOffer?.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="bg-green-50 rounded-xl p-4 text-center">
-                    <p className="text-xs text-green-600 mb-1">Extra earned</p>
-                    <p className="text-base font-bold text-green-700">
-                      {extraEarned && extraEarned > 0 ? `LKR ${extraEarned.toLocaleString()}` : '✓'}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Negotiation ladder */}
-              {match.negotiation_status !== 'agreed' && (
-                <div className="border border-gray-100 rounded-xl p-4">
-                  <p className="text-xs font-medium text-gray-700 mb-3">
-                    Adjust your offer — move ±LKR 100 per step
-                  </p>
-
-                  <div className="flex items-center justify-between mb-3">
-                    <button
-                      onClick={() => negotiate('down')}
-                      disabled={negotiating || (myOffer ?? 0) <= (match.ladder_min ?? 0)}
-                      className="w-12 h-12 rounded-full border border-gray-200 text-gray-700 text-xl font-bold hover:bg-gray-50 disabled:opacity-30 transition"
-                    >
-                      −
-                    </button>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-gray-900">
-                        LKR {myOffer?.toLocaleString()}
-                      </p>
-                      <p className="text-xs text-gray-400">Your offer</p>
-                    </div>
-                    <button
-                      onClick={() => negotiate('up')}
-                      disabled={negotiating || (myOffer ?? 0) >= (match.ladder_max ?? 0)}
-                      className="w-12 h-12 rounded-full border border-gray-200 text-gray-700 text-xl font-bold hover:bg-gray-50 disabled:opacity-30 transition"
-                    >
-                      +
-                    </button>
-                  </div>
-
-                  {/* Ladder visualization */}
-                  <div className="flex items-center gap-1 mb-3">
-                    {[-300, -200, -100, 0, 100, 200, 300].map(offset => {
-                      const price = (match.anchor_price ?? 0) + offset
-                      const isMyOffer = price === myOffer
-                      const isTheirOffer = price === theirOffer
-                      return (
-                        <div key={offset} className="flex-1 flex flex-col items-center gap-1">
-                          <div className={`w-full h-1.5 rounded-full ${
-                            isMyOffer && isTheirOffer ? 'bg-green-500' :
-                            isMyOffer ? 'bg-gray-900' :
-                            isTheirOffer ? 'bg-blue-400' :
-                            'bg-gray-100'
-                          }`} />
-                          <span className="text-xs text-gray-300" style={{ fontSize: 9 }}>
-                            {(price / 1000).toFixed(1)}k
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <div className="flex justify-between text-xs text-gray-400">
-                    <span>⬛ You</span>
-                    <span>🟦 Them</span>
-                    <span>🟩 Overlap = deal!</span>
-                  </div>
-
-                  <p className="text-xs text-gray-400 mt-3 text-center">
-                    When your offers overlap, the deal auto-completes at the midpoint.
-                  </p>
-                </div>
-              )}
-
-              {/* Deal agreed */}
-              {match.negotiation_status === 'agreed' && (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
-                  <p className="text-green-700 font-semibold mb-1">
-                    🎉 Deal agreed at LKR {match.agreed_price?.toLocaleString()}
-                  </p>
-                  <p className="text-green-600 text-xs">
-                    Use the chat below to arrange the swap details.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Chat — only unlocks after deal agreed */}
-            {match.negotiation_status === 'agreed' ? (
-              <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100">
-                  <h2 className="font-semibold text-gray-900">Swap details</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Arrange pickup or delivery here
-                  </p>
-                </div>
-
-                {!emailSaved ? (
-                  <div className="p-5">
-                    <p className="text-sm text-gray-500 mb-3">Enter your email to join:</p>
-                    <div className="flex gap-2">
-                      <input type="email" placeholder="your@email.com"
-                        className="flex-1 border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                        value={myEmail} onChange={e => setMyEmail(e.target.value)} />
-                      <button onClick={() => { if (myEmail) setEmailSaved(true) }}
-                        className="bg-gray-900 text-white px-5 py-2 rounded-full text-sm">
-                        Join
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {/* PickMe / Uber suggestion */}
-                    <div className="mx-4 mt-4 bg-gray-50 border border-gray-100 rounded-xl p-4">
-                      <p className="text-xs font-medium text-gray-700 mb-2">
-                        📦 Arrange delivery
-                      </p>
-                      <div className="flex gap-2">
-                        <a
-                          href="https://pickme.lk"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 bg-orange-500 text-white text-xs py-2 rounded-full text-center font-medium hover:bg-orange-600 transition"
-                        >
-                          PickMe Delivery
-                        </a>
-                        <a
-                          href="https://uber.com"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 bg-black text-white text-xs py-2 rounded-full text-center font-medium hover:bg-gray-800 transition"
-                        >
-                          Uber Connect
-                        </a>
-                      </div>
-                    </div>
-
-                    <div className="h-64 overflow-y-auto p-4 flex flex-col gap-3 bg-gray-50 mt-2">
-                      {messages.length === 0 && (
-                        <p className="text-center text-gray-300 text-sm mt-8">
-                          Agree on pickup/delivery details here
-                        </p>
-                      )}
-                      {messages.map(msg => (
-                        <div key={msg.id}
-                          className={`flex ${msg.sender_email === myEmail ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-xs rounded-2xl px-4 py-2.5 text-sm ${
-                            msg.sender_email === myEmail
-                              ? 'bg-gray-900 text-white rounded-br-sm'
-                              : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm'
-                          }`}>
-                            <p>{msg.content}</p>
-                            <p className="text-xs mt-1 opacity-50">
-                              {msg.sender_email === myEmail ? 'You' : msg.sender_email.split('@')[0]}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                      <div ref={bottomRef} />
-                    </div>
-
-                    <div className="px-4 py-3 border-t border-gray-100 flex gap-2 bg-white">
-                      <input type="text" placeholder="Type a message..."
-                        className="flex-1 border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                        value={newMessage}
-                        onChange={e => setNewMessage(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') sendMessage() }} />
-                      <button onClick={sendMessage}
-                        disabled={sending || !newMessage.trim()}
-                        className="bg-gray-900 text-white px-5 py-2 rounded-full text-sm disabled:opacity-40">
-                        Send
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 text-center">
-                <p className="text-gray-400 text-sm">
-                  💬 Chat unlocks once you both agree on a price above.
-                </p>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center shadow-sm">
-            <p className="text-4xl mb-3">🔍</p>
-            <p className="font-semibold text-gray-700 mb-1">Looking for a match</p>
-            <p className="text-gray-400 text-sm">
-              Chat and pricing unlock once matched.
-            </p>
+        {/* Payment return banners */}
+        {paymentStatus === 'success' && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl px-6 py-4 text-sm text-green-700 font-medium">
+            ✓ Payment received! Both sides need to pay before chat unlocks.
           </div>
         )}
+        {paymentStatus === 'cancelled' && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl px-6 py-4 text-sm text-red-600">
+            Payment was cancelled. You can try again below.
+          </div>
+        )}
+
+        {/* ── Listing card ─────────────────────────────────────────────────── */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-7 shadow-sm">
+          <div className="flex items-start justify-between gap-4 mb-5">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{listing.model}</h1>
+              <p className="text-gray-400 text-sm mt-0.5">{listing.location}</p>
+            </div>
+            <span className={`text-xs font-medium px-3 py-1.5 rounded-full border ${conditionColor}`}>
+              {listing.condition}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="bg-gray-50 rounded-xl p-4">
+              <p className="text-gray-400 text-xs mb-1">Has</p>
+              <p className="text-gray-900 font-medium">{listing.has_component}</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4">
+              <p className="text-gray-400 text-xs mb-1">Needs</p>
+              <p className="text-gray-900 font-medium">{listing.needs_component}</p>
+            </div>
+          </div>
+
+          {listing.asking_price && (
+            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+              <span className="text-sm text-gray-500">Asking price</span>
+              <span className="text-lg font-semibold text-gray-900">
+                LKR {listing.asking_price.toLocaleString()}
+              </span>
+            </div>
+          )}
+
+          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
+            <span>{listing.user_email}</span>
+            <span>{new Date(listing.created_at).toLocaleDateString()}</span>
+          </div>
+        </div>
+
+        {/* ── No match yet ─────────────────────────────────────────────────── */}
+        {!listing.matched || !match ? (
+          <div className="bg-white border border-gray-200 rounded-2xl px-7 py-12 text-center shadow-sm">
+            <div className="text-3xl mb-3">⏳</div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Looking for your match</h2>
+            <p className="text-gray-400 text-sm max-w-xs mx-auto">
+              We'll notify you when we find someone with a compatible bud.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* ── Match banner ───────────────────────────────────────────── */}
+            <div className={`rounded-2xl px-6 py-4 flex items-center gap-3 text-sm font-medium border ${
+              bothPaid
+                ? 'bg-green-50 border-green-200 text-green-700'
+                : match.negotiation_status === 'agreed'
+                  ? 'bg-blue-50 border-blue-200 text-blue-700'
+                  : 'bg-amber-50 border-amber-200 text-amber-700'
+            }`}>
+              <span className="text-xl">
+                {bothPaid ? '🤝' : match.negotiation_status === 'agreed' ? '💳' : '⚡'}
+              </span>
+              <span>
+                {bothPaid
+                  ? `Deal confirmed at LKR ${match.agreed_price?.toLocaleString()} — chat is open`
+                  : match.negotiation_status === 'agreed'
+                    ? `Deal agreed at LKR ${match.agreed_price?.toLocaleString()} — pay the platform fee to unlock chat`
+                    : 'You have a match! Negotiate a price below.'}
+              </span>
+            </div>
+
+            {/* ── Negotiation card ───────────────────────────────────────── */}
+            {match.negotiation_status !== 'agreed' && (
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                <div className="px-7 pt-6 pb-4 border-b border-gray-100">
+                  <h2 className="text-lg font-semibold text-gray-900">Negotiate the price</h2>
+                  <p className="text-sm text-gray-400 mt-0.5">
+                    Move in LKR 100 steps. Deal locks when offers meet.
+                  </p>
+                </div>
+
+                <div className="p-7 grid grid-cols-2 gap-6 text-sm">
+                  {/* Buyer side */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Buyer offer</p>
+                    <p className="text-3xl font-bold text-gray-900">
+                      LKR {(match.buyer_offer ?? match.anchor_price).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Market: LKR {match.market_reference?.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-green-600">
+                      Save LKR {(match.market_reference - (match.buyer_offer ?? match.anchor_price)).toLocaleString()} vs market
+                    </p>
+                  </div>
+
+                  {/* Seller side */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Seller offer</p>
+                    <p className="text-3xl font-bold text-gray-900">
+                      LKR {(match.seller_offer ?? match.anchor_price).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Outside est.: LKR {match.typical_outside_sale?.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-green-600">
+                      +LKR {((match.seller_offer ?? match.anchor_price) - match.typical_outside_sale).toLocaleString()} vs outside sale
+                    </p>
+                  </div>
+                </div>
+
+                {/* Range bar */}
+                <div className="px-7 pb-5">
+                  <div className="relative h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="absolute h-full bg-gray-900 rounded-full transition-all duration-300"
+                      style={{
+                        left: `${((match.buyer_offer ?? match.anchor_price) - match.ladder_min) / (match.ladder_max - match.ladder_min) * 100}%`,
+                        right: `${100 - ((match.seller_offer ?? match.anchor_price) - match.ladder_min) / (match.ladder_max - match.ladder_min) * 100}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-400 mt-1.5">
+                    <span>LKR {match.ladder_min?.toLocaleString()}</span>
+                    <span>LKR {match.ladder_max?.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {/* Controls */}
+                {currentUser && (
+                  <div className="px-7 pb-7">
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <p className="text-xs text-gray-500 mb-3">
+                        You are the <strong className="text-gray-900">{userRole}</strong>
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleNegotiate('down')}
+                          disabled={negotiating}
+                          className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-full text-sm font-medium hover:border-gray-400 transition disabled:opacity-40"
+                        >
+                          − LKR 100
+                        </button>
+                        <button
+                          onClick={() => handleNegotiate('up')}
+                          disabled={negotiating}
+                          className="flex-1 bg-gray-900 text-white py-2.5 rounded-full text-sm font-medium hover:bg-black transition disabled:opacity-40"
+                        >
+                          + LKR 100
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Payment card — shown after deal agreed, before both paid ── */}
+            {match.negotiation_status === 'agreed' && !bothPaid && (
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                <div className="px-7 pt-6 pb-4 border-b border-gray-100">
+                  <h2 className="text-lg font-semibold text-gray-900">Pay the platform fee</h2>
+                  <p className="text-sm text-gray-400 mt-0.5">
+                    LKR 200 each. Chat unlocks when both sides have paid.
+                  </p>
+                </div>
+
+                <div className="p-7 space-y-4">
+                  {/* Payment status indicators */}
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className={`rounded-xl px-4 py-3 border text-center ${
+                      match.buyer_paid
+                        ? 'bg-green-50 border-green-200 text-green-700'
+                        : 'bg-gray-50 border-gray-200 text-gray-400'
+                    }`}>
+                      {match.buyer_paid ? '✓ Buyer paid' : 'Buyer — pending'}
+                    </div>
+                    <div className={`rounded-xl px-4 py-3 border text-center ${
+                      match.seller_paid
+                        ? 'bg-green-50 border-green-200 text-green-700'
+                        : 'bg-gray-50 border-gray-200 text-gray-400'
+                    }`}>
+                      {match.seller_paid ? '✓ Seller paid' : 'Seller — pending'}
+                    </div>
+                  </div>
+
+                  {/* Pay button — only show if this user hasn't paid yet */}
+                  {currentUser && !userHasPaid && (
+                    <button
+                      onClick={handlePayment}
+                      disabled={paying}
+                      className="w-full bg-gray-900 text-white py-3.5 rounded-full text-sm font-medium hover:bg-black transition disabled:opacity-40"
+                    >
+                      {paying ? 'Redirecting to PayHere...' : 'Pay LKR 200 →'}
+                    </button>
+                  )}
+
+                  {userHasPaid && !bothPaid && (
+                    <p className="text-sm text-center text-gray-400">
+                      Your payment is done. Waiting for the other party to pay.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Chat card ──────────────────────────────────────────────── */}
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-7 pt-6 pb-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Chat</h2>
+                  {!bothPaid && (
+                    <p className="text-sm text-gray-400 mt-0.5">
+                      {!chatUnlocked
+                        ? 'Agree on a price to unlock'
+                        : 'Unlocks after both sides pay'}
+                    </p>
+                  )}
+                </div>
+                {bothPaid && match.agreed_price && (
+                  <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-full font-medium">
+                    Deal: LKR {match.agreed_price.toLocaleString()}
+                  </span>
+                )}
+              </div>
+
+              {!bothPaid ? (
+                <div className="px-7 py-12 text-center text-gray-400 text-sm">
+                  <div className="text-3xl mb-3">🔒</div>
+                  <p>
+                    {!chatUnlocked
+                      ? 'Agree on a price above to proceed.'
+                      : 'Complete payment above to unlock chat.'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Messages */}
+                  <div className="px-7 py-5 space-y-3 max-h-80 overflow-y-auto">
+                    {messages.length === 0 ? (
+                      <p className="text-center text-gray-400 text-sm py-8">
+                        No messages yet. Say hi! 👋
+                      </p>
+                    ) : (
+                      messages.map((msg) => {
+                        const isMe = msg.sender_email === currentUser
+                        return (
+                          <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-xs rounded-2xl px-4 py-2.5 text-sm ${
+                              isMe
+                                ? 'bg-gray-900 text-white rounded-br-sm'
+                                : 'bg-gray-100 text-gray-800 rounded-bl-sm'
+                            }`}>
+                              {!isMe && (
+                                <p className="text-xs opacity-50 mb-1">{msg.sender_email.split('@')[0]}</p>
+                              )}
+                              {msg.content}
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+
+                  {/* Delivery quick links */}
+                  <div className="px-7 pb-3 flex gap-2">
+                    <a
+                      href="https://pickme.lk"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 border border-gray-200 text-gray-500 text-xs py-2.5 rounded-full text-center hover:border-gray-400 transition"
+                    >
+                      📦 PickMe
+                    </a>
+                    <a
+                      href="https://www.uber.com/lk/en/ride/uber-connect/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 border border-gray-200 text-gray-500 text-xs py-2.5 rounded-full text-center hover:border-gray-400 transition"
+                    >
+                      🚗 Uber Connect
+                    </a>
+                  </div>
+
+                  {/* Message input */}
+                  <div className="px-7 pb-7 flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Type a message..."
+                      className="flex-1 bg-gray-50 border border-gray-200 rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                    />
+                    <button
+                      onClick={sendMessage}
+                      disabled={sending || !newMessage.trim()}
+                      className="bg-gray-900 text-white px-5 py-3 rounded-full text-sm font-medium hover:bg-black transition disabled:opacity-40"
+                    >
+                      Send
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
       </div>
     </main>
   )

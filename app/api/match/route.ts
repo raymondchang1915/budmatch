@@ -25,6 +25,34 @@ const CONDITION_SCORE: Record<string, number> = {
   'Unknown': 0.3,
 }
 
+// Maps component variants to their core bud side
+const COMPONENT_CORE: Record<string, string> = {
+  'Left bud + Case':      'Left bud',
+  'Left bud only':        'Left bud',
+  'Right bud + Case':     'Right bud',
+  'Right bud only':       'Right bud',
+  'Case only':            'Case',
+  'Both buds (no case)':  'Both buds',
+  'Complete set':         'Complete set',
+}
+
+function compatible(a: Listing, b: Listing): boolean {
+  if (a.model !== b.model) return false
+  if (a.user_email === b.user_email) return false
+
+  const coreA = COMPONENT_CORE[a.has_component] ?? a.has_component
+  const coreB = COMPONENT_CORE[b.has_component] ?? b.has_component
+
+  // Valid matching pairs — left bud holder matches with right bud holder
+  // Case ownership is a bonus, not a hard requirement
+  const validPairs: [string, string][] = [
+    ['Left bud',  'Right bud'],
+    ['Right bud', 'Left bud'],
+  ]
+
+  return validPairs.some(([x, y]) => coreA === x && coreB === y)
+}
+
 function locationSimilarity(a: string, b: string): number {
   if (!a || !b) return 0.5
   const cityA = a.toLowerCase().split(',')[0].trim()
@@ -37,15 +65,6 @@ function recencyScore(createdAt: string): number {
   return Math.max(0, 1 - ageDays / 30)
 }
 
-function compatible(a: Listing, b: Listing): boolean {
-  return (
-    a.model === b.model &&
-    a.user_email !== b.user_email &&
-    a.has_component === b.needs_component &&
-    a.needs_component === b.has_component
-  )
-}
-
 function scoreEdge(a: Listing, b: Listing): number {
   const condA = CONDITION_SCORE[a.condition] ?? 0.3
   const condB = CONDITION_SCORE[b.condition] ?? 0.3
@@ -53,7 +72,10 @@ function scoreEdge(a: Listing, b: Listing): number {
   const locSim = locationSimilarity(a.location, b.location)
   const recency = (recencyScore(a.created_at) + recencyScore(b.created_at)) / 2
 
-  // price proximity
+  // Bonus score if one party has the case
+  const hasCase =
+    a.has_component.includes('Case') || b.has_component.includes('Case') ? 0.1 : 0
+
   let priceSim = 0.1
   if (a.asking_price && b.asking_price) {
     const diff = Math.abs(a.asking_price - b.asking_price)
@@ -61,11 +83,10 @@ function scoreEdge(a: Listing, b: Listing): number {
     priceSim = 1 - Math.min(diff / avg, 1)
   }
 
-  return conditionSim * 0.35 + locSim * 0.25 + recency * 0.25 + priceSim * 0.15
+  return conditionSim * 0.30 + locSim * 0.25 + recency * 0.20 + priceSim * 0.15 + hasCase
 }
 
 async function computeDualPricing(a: Listing, b: Listing, model: string) {
-  // get market price
   const { data: mp } = await supabase
     .from('model_prices')
     .select('market_price')
@@ -74,27 +95,15 @@ async function computeDualPricing(a: Listing, b: Listing, model: string) {
 
   const marketFull = mp?.market_price ?? 25000
   const componentMarket = Math.round(marketFull * 0.40)
-
-  // typical outside sale price (what seller would get outside)
   const typicalOutsideSale = Math.round(componentMarket * 0.80)
-
-  // platform prices — buyer gets good deal vs market
-  // seller gets slightly more than typical outside sale
   const platformFeePerSide = 200
-
-  // anchor price — slightly below market to create perceived savings
   const anchorPrice = Math.round(componentMarket * 0.92)
 
-  // buyer pays anchor (saves vs market)
   const buyerPriceA = anchorPrice
   const buyerPriceB = anchorPrice
-
-  // seller gets anchor minus fee
-  // but we show them: "you earn more than typical"
   const sellerPayoutA = Math.round(buyerPriceA - platformFeePerSide)
   const sellerPayoutB = Math.round(buyerPriceB - platformFeePerSide)
 
-  // negotiation ladder bounds (±3 steps of 100)
   const ladderMin = anchorPrice - 300
   const ladderMax = anchorPrice + 300
 
