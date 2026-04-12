@@ -15,9 +15,17 @@ const PAYHERE_BASE = 'https://sandbox.payhere.lk/pay/checkout'
 function generateHash(merchantId: string, orderId: string, amount: string, currency: string, secret: string): string {
   const secretHash = crypto.createHash('md5').update(secret).digest('hex').toUpperCase()
   const raw = `${merchantId}${orderId}${amount}${currency}${secretHash}`
-  return crypto.createHash('md5').update(raw).digest('hex').toUpperCase()
+  console.log('=== PAYHERE DEBUG ===')
+  console.log('merchantId:', merchantId)
+  console.log('orderId:', orderId)
+  console.log('amount:', amount)
+  console.log('currency:', currency)
+  console.log('secretHash:', secretHash)
+  console.log('raw string:', raw)
+  const hash = crypto.createHash('md5').update(raw).digest('hex').toUpperCase()
+  console.log('final hash:', hash)
+  return hash
 }
-
 export async function POST(req: NextRequest) {
   const { match_id, payer_email, role } = await req.json()
   // role = 'buyer' | 'seller'
