@@ -165,27 +165,25 @@ export default function ListingDetail() {
   }
 
   async function handlePayment() {
-    if (!currentUser || !match || !myRole) return
-    setPaying(true)
-    const res = await fetch('/api/payhere', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ match_id: match.id, payer_email: currentUser, role: myRole }),
-    })
-    const json = await res.json()
-    if (json.error) { setPaying(false); alert(json.error); return }
-    const form = document.createElement('form')
-    form.method = 'POST'
-    form.action = json.checkout_url
-    Object.entries(json.params).forEach(([key, value]) => {
-      const input = document.createElement('input')
-      input.type = 'hidden'
-      input.name = key
-      input.value = value as string
-      form.appendChild(input)
-    })
-    document.body.appendChild(form)
-    form.submit()
+  if (!currentUser || !match || !myRole) return
+  setPaying(true)
+
+  // Mark this user as paid directly — PayHere skipped for now
+  const field = myRole === 'buyer' ? 'buyer_paid' : 'seller_paid'
+  await supabase.from('matches').update({ [field]: true }).eq('id', match.id)
+
+  // Check if both paid
+  const updatedBuyerPaid = myRole === 'buyer' ? true : match.buyer_paid
+  const updatedSellerPaid = myRole === 'seller' ? true : match.seller_paid
+
+  if (updatedBuyerPaid && updatedSellerPaid) {
+    await supabase.from('matches').update({ status: 'paid' }).eq('id', match.id)
+  }
+
+  // Reload match
+  const { data: fresh } = await supabase.from('matches').select('*').eq('id', match.id).single()
+  if (fresh) setMatch(fresh)
+  setPaying(false)
   }
 
   async function sendMessage() {
