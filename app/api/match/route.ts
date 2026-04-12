@@ -12,6 +12,7 @@ type Listing = {
   has_component: string  // 'Left bud' | 'Right bud'
   has_case: boolean
   needs_component: string
+  listing_type: string   // 'buying' | 'selling' | 'both'
   condition: string
   location: string
   user_email: string
@@ -21,27 +22,18 @@ type Listing = {
   matched: boolean
 }
 
-// ── Condition score ────────────────────────────────────────────
 const CONDITION_SCORE: Record<string, number> = {
   'Working perfectly': 1.0,
   'Usable': 0.6,
   'Unknown': 0.3,
 }
 
-// ── Pricing formula ────────────────────────────────────────────
-// Price = marketPrice × conditionFactor × ageFactor × demandFactor
-// Always between 10% and 60% of market price
 async function computePrice(listing: Listing, marketPrice: number): Promise<number> {
   const condition = CONDITION_SCORE[listing.condition] ?? 0.3
-
-  // age factor — newer = worth more
   const currentYear = new Date().getFullYear()
-  const age = listing.year_of_purchase
-    ? currentYear - listing.year_of_purchase
-    : 2 // assume 2 years old if not provided
-  const ageFactor = Math.max(0.4, 1 - age * 0.12) // loses 12% per year, floor at 40%
+  const age = listing.year_of_purchase ? currentYear - listing.year_of_purchase : 2
+  const ageFactor = Math.max(0.4, 1 - age * 0.12)
 
-  // demand factor from demand_stats
   const { data } = await supabase
     .from('demand_stats')
     .select('need_count, have_count')
@@ -51,41 +43,29 @@ async function computePrice(listing: Listing, marketPrice: number): Promise<numb
 
   const needCount = data?.need_count ?? 0
   const haveCount = data?.have_count ?? 1
-  const demandRatio = needCount / (needCount + haveCount) // 0 to 1
-  // demand pushes price up — high demand can go above 50%
-  const demandFactor = 0.3 + demandRatio * 0.3 // range: 0.30 to 0.60
+  const demandRatio = needCount / (needCount + haveCount)
+  const demandFactor = 0.3 + demandRatio * 0.3
 
   const rawPrice = marketPrice * condition * ageFactor * demandFactor
-
-  // hard cap: 10% to 60% of market price
   const minPrice = marketPrice * 0.10
   const maxPrice = marketPrice * 0.60
   return Math.round(Math.max(minPrice, Math.min(maxPrice, rawPrice)) / 100) * 100
 }
 
-// ── Edge score for matching ────────────────────────────────────
 function scoreEdge(a: Listing, b: Listing): number {
   const condA = CONDITION_SCORE[a.condition] ?? 0.3
   const condB = CONDITION_SCORE[b.condition] ?? 0.3
   const conditionSim = 1 - Math.abs(condA - condB)
-
-  // location match
   const cityA = a.location?.toLowerCase().split(',')[0].trim() ?? ''
   const cityB = b.location?.toLowerCase().split(',')[0].trim() ?? ''
   const locSim = cityA && cityB && cityA === cityB ? 1.0 : 0.2
-
-  // recency
   const ageA = (Date.now() - new Date(a.created_at).getTime()) / 86400000
   const ageB = (Date.now() - new Date(b.created_at).getTime()) / 86400000
   const recency = Math.max(0, 1 - (ageA + ageB) / 60)
-
-  // case bonus — if one of them has the case, slightly prefer that match
   const caseBonus = (a.has_case || b.has_case) ? 0.1 : 0
-
   return conditionSim * 0.40 + locSim * 0.30 + recency * 0.20 + caseBonus * 0.10
 }
 
-// ── Compatibility — only left↔right, same model ────────────────
 function compatible(a: Listing, b: Listing): boolean {
   if (a.model !== b.model) return false
   if (a.user_email === b.user_email) return false
@@ -95,7 +75,32 @@ function compatible(a: Listing, b: Listing): boolean {
   )
 }
 
-// ── Run matching for one model group ──────────────────────────
+// ── Assign buyer/seller roles within a compatible pair ─────────
+// Returns { buyer, seller } or null if neither wants to trade yet
+function assignRoles(
+  a: Listing,
+  b: Listing
+): { buyer: Listing; seller: Listing; switchSuggested: boolean } | null {
+  const aType = a.listing_type  // 'buying' | 'selling' | 'both'
+  const bType = b.listing_type
+
+  // Clear case: one buying, one selling
+  if (aType === 'buying' && bType === 'selling') return { buyer: a, seller: b, switchSuggested: false }
+  if (aType === 'selling' && bType === 'buying') return { buyer: b, seller: a, switchSuggested: false }
+
+  // Ambiguous cases: both buying, both selling, one or both 'both'
+  // Whoever has higher asking price becomes buyer (willing to pay more)
+  // If prices equal or null, fall back to whoever listed first
+  const priceA = a.asking_price ?? 0
+  const priceB = b.asking_price ?? 0
+
+  if (priceA >= priceB) {
+    return { buyer: a, seller: b, switchSuggested: true }
+  } else {
+    return { buyer: b, seller: a, switchSuggested: true }
+  }
+}
+
 async function runMatchingForModel(model: string) {
   const { data: listings } = await supabase
     .from('listings')
@@ -105,7 +110,6 @@ async function runMatchingForModel(model: string) {
 
   if (!listings || listings.length < 2) return { matched: 0 }
 
-  // get market price
   const { data: mp } = await supabase
     .from('model_prices')
     .select('market_price')
@@ -113,7 +117,7 @@ async function runMatchingForModel(model: string) {
     .single()
   const marketPrice = mp?.market_price ?? 25000
 
-  // build edges
+  // Build compatible edges
   const edges: { score: number; a: Listing; b: Listing }[] = []
   for (let i = 0; i < listings.length; i++) {
     for (let j = i + 1; j < listings.length; j++) {
@@ -127,6 +131,7 @@ async function runMatchingForModel(model: string) {
     }
   }
 
+  // Sort best matches first
   edges.sort((x, y) => y.score - x.score)
 
   const matchedIds = new Set<string>()
@@ -135,35 +140,32 @@ async function runMatchingForModel(model: string) {
   for (const edge of edges) {
     if (matchedIds.has(edge.a.id) || matchedIds.has(edge.b.id)) continue
 
-    // compute price for each listing separately
-    const priceA = await computePrice(edge.a, marketPrice)
-    const priceB = await computePrice(edge.b, marketPrice)
+    const roles = assignRoles(edge.a, edge.b)
+    if (!roles) continue
 
-    // platform keeps spread
-    const platformFee = 200
-    const anchorPrice = Math.round((priceA + priceB) / 2)
+    const { buyer, seller, switchSuggested } = roles
+
+    const buyerPrice = await computePrice(buyer, marketPrice)
+    const sellerPrice = await computePrice(seller, marketPrice)
+    const anchorPrice = Math.round((buyerPrice + sellerPrice) / 2)
 
     await supabase.from('matches').insert([{
-      listing_a: edge.a.id,
-      listing_b: edge.b.id,
+      listing_a: seller.id,   // listing_a is always seller
+      listing_b: buyer.id,    // listing_b is always buyer
       status: 'pending',
       score: edge.score,
       anchor_price: anchorPrice,
-      buyer_price_a: priceA,
-      buyer_price_b: priceB,
-      seller_payout_a: priceA - platformFee,
-      seller_payout_b: priceB - platformFee,
-      platform_fee: platformFee * 2,
       market_reference: Math.round(marketPrice * 0.40),
       ladder_min: anchorPrice - 300,
       ladder_max: anchorPrice + 300,
       buyer_offer: anchorPrice,
       seller_offer: anchorPrice,
       negotiation_status: 'pending',
+      switch_suggested: switchSuggested,
     }])
 
-    await supabase.from('listings').update({ matched: true }).eq('id', edge.a.id)
-    await supabase.from('listings').update({ matched: true }).eq('id', edge.b.id)
+    await supabase.from('listings').update({ matched: true }).eq('id', buyer.id)
+    await supabase.from('listings').update({ matched: true }).eq('id', seller.id)
 
     matchedIds.add(edge.a.id)
     matchedIds.add(edge.b.id)
@@ -183,7 +185,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, ...result })
     }
 
-    // global run
     const { data: models } = await supabase
       .from('listings')
       .select('model')

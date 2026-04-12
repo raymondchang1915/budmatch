@@ -44,22 +44,22 @@ export async function POST(req: NextRequest) {
   if (!verifyHash(params)) return new NextResponse('Bad signature', { status: 400 })
   if (params.status_code !== '2') return new NextResponse('OK', { status: 200 })
 
-  const [matchId, role] = params.order_id.split('-')
-  const updateField = role === 'buyer' ? 'buyer_paid' : 'seller_paid'
+  const [matchId, party] = params.order_id.split('-')
+  const updateField = party === 'a' ? 'party_a_paid' : 'party_b_paid'
 
   await supabase.from('matches').update({ [updateField]: true }).eq('id', matchId)
 
   const { data: match } = await supabase
     .from('matches')
-    .select('buyer_paid, seller_paid, listing_a, listing_b, listingA:listings!listing_a(model, user_email, shop_code), listingB:listings!listing_b(user_email)')
+    .select('party_a_paid, party_b_paid, listing_a, listing_b, listingA:listings!listing_a(model, user_email, shop_code), listingB:listings!listing_b(user_email)')
     .eq('id', matchId)
     .single()
 
   if (!match) return new NextResponse('OK', { status: 200 })
 
   const bothPaid =
-    (role === 'buyer' ? true : !!match.buyer_paid) &&
-    (role === 'seller' ? true : !!match.seller_paid)
+    (party === 'a' ? true : !!match.party_a_paid) &&
+    (party === 'b' ? true : !!match.party_b_paid)
 
   if (bothPaid) {
     await supabase.from('matches').update({ status: 'paid' }).eq('id', matchId)
