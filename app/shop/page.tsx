@@ -71,7 +71,7 @@ export default function ShopLanding() {
             </div>
           </div>
           <p className="text-xs text-gray-400">
-            Commission = 10% of BudMatch platform fee (LKR 400 per match × 10% = LKR 40)
+            Commission = Upto 50% of BudMatch platform fee (If platform fee is 10% of the bud price the shop will get 5%)
           </p>
         </div>
 
