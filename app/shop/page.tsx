@@ -39,7 +39,7 @@ export default function ShopLanding() {
             {
               num: '03',
               title: 'Earn commission',
-              desc: 'Get 10% of every successful match fee from listings using your code.',
+              desc: 'Get 50% of the platform fee from every confirmed match using your code.',
             },
           ].map((item, i) => (
             <div key={item.num}
@@ -53,36 +53,40 @@ export default function ShopLanding() {
           ))}
         </div>
 
-        {/* Earnings example */}
+        {/* How commission is calculated */}
         <div className="bg-gray-900 text-white rounded-2xl p-6 mb-8">
-          <h2 className="font-bold text-lg mb-4">Example earnings</h2>
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div className="bg-white/10 rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold">10</p>
-              <p className="text-xs text-gray-400 mt-1">matches/month</p>
+          <h2 className="font-bold text-lg mb-4">How your commission is calculated</h2>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between items-center py-2 border-b border-white/10">
+              <span className="text-gray-400">Buyer and seller agree on a price</span>
+              <span className="font-medium">e.g. LKR 6,000</span>
             </div>
-            <div className="bg-white/10 rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold">LKR 40</p>
-              <p className="text-xs text-gray-400 mt-1">per match</p>
+            <div className="flex justify-between items-center py-2 border-b border-white/10">
+              <span className="text-gray-400">Platform fee (10% of agreed price)</span>
+              <span className="font-medium">LKR 600</span>
             </div>
-            <div className="bg-white/10 rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold">LKR 400</p>
-              <p className="text-xs text-gray-400 mt-1">monthly</p>
+            <div className="flex justify-between items-center py-2 border-b border-white/10">
+              <span className="text-gray-400">Split equally — 5% from buyer, 5% from seller</span>
+              <span className="font-medium">LKR 300 + LKR 300</span>
+            </div>
+            <div className="flex justify-between items-center py-2">
+              <span className="text-white font-medium">Your commission (50% of platform fee)</span>
+              <span className="text-green-400 font-bold text-lg">LKR 300</span>
             </div>
           </div>
-          <p className="text-xs text-gray-400">
-            Commission = Upto 50% of BudMatch platform fee (If platform fee is 10% of the bud price the shop will get 5%)
+          <p className="text-xs text-gray-400 mt-4">
+            Higher agreed prices = higher commissions. No flat fees — your earnings scale with every match.
           </p>
         </div>
 
-        {/* Also serves as drop-off point */}
+        {/* Drop-off point */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-8">
           <h2 className="font-semibold text-gray-900 mb-2">Also become a drop-off point</h2>
           <p className="text-gray-400 text-sm mb-4">
             Let matched users use your shop as a safe exchange location.
             Builds foot traffic and trust in your community.
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
               ✓ Free to join
             </span>
@@ -90,7 +94,7 @@ export default function ShopLanding() {
               ✓ No monthly fees
             </span>
             <span className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-medium">
-              ✓ Pay per match
+              ✓ Earn per match
             </span>
           </div>
         </div>

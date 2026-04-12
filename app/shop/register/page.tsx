@@ -29,10 +29,7 @@ export default function ShopRegister() {
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5 ml-1"
 
   const captureGPS = () => {
-    if (!navigator.geolocation) {
-      setGpsStatus('error')
-      return
-    }
+    if (!navigator.geolocation) { setGpsStatus('error'); return }
     setGpsStatus('loading')
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -40,22 +37,15 @@ export default function ShopRegister() {
         const lng = pos.coords.longitude
         setCoords({ lat, lng })
         try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
-          )
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
           const data = await res.json()
           const city = data.address?.city || data.address?.town || data.address?.suburb || ''
           const country = data.address?.country || ''
           setLocationLabel(`${city}, ${country}`.trim().replace(/^,\s*/, ''))
-        } catch {
-          setLocationLabel('Location captured')
-        }
+        } catch { setLocationLabel('Location captured') }
         setGpsStatus('done')
       },
-      (err) => {
-        console.error('GPS error:', err)
-        setGpsStatus('error')
-      },
+      (err) => { console.error('GPS error:', err); setGpsStatus('error') },
       { enableHighAccuracy: true, timeout: 10000 }
     )
   }
@@ -64,9 +54,7 @@ export default function ShopRegister() {
     if (!coords) { setError('Please capture your shop GPS location first.'); return }
     setLoading(true)
     setError('')
-
     const shop_code = generateShopCode(form.shop_name)
-
     const { error: insertError } = await supabase.from('shop_partners').insert([{
       ...form,
       location: locationLabel,
@@ -75,7 +63,6 @@ export default function ShopRegister() {
       shop_code,
       active: false,
     }])
-
     if (insertError) { setError(insertError.message); setLoading(false); return }
     setSuccess(shop_code)
     setLoading(false)
@@ -114,7 +101,7 @@ export default function ShopRegister() {
           <span className="text-sm text-gray-500 tracking-wide">Shop partners</span>
         </div>
         <h1 className="text-5xl font-bold text-gray-900 tracking-tight mb-2">Register your shop.</h1>
-        <p className="text-gray-400 mb-10">Earn 10% commission on every match you refer.</p>
+        <p className="text-gray-400 mb-10">Earn 50% of the platform fee on every match you refer.</p>
 
         <div className="flex flex-col gap-5">
 
@@ -147,54 +134,36 @@ export default function ShopRegister() {
             <label className={labelClass}>Shop location <span className="text-red-400">*</span></label>
             <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-3">
               <p className="text-xs text-gray-500">
-                We pin your shop using GPS so customers know where you are and so we can verify you're real. Location access is required.
+                We pin your shop using GPS so customers know where you are and so we can verify you're real.
               </p>
-
               {gpsStatus === 'idle' && (
-                <button
-                  type="button"
-                  onClick={captureGPS}
-                  className="w-full border border-gray-200 text-gray-700 py-3 rounded-full text-sm font-medium hover:border-gray-900 transition flex items-center justify-center gap-2"
-                >
+                <button type="button" onClick={captureGPS}
+                  className="w-full border border-gray-200 text-gray-700 py-3 rounded-full text-sm font-medium hover:border-gray-900 transition flex items-center justify-center gap-2">
                   📍 Capture my location
                 </button>
               )}
-
               {gpsStatus === 'loading' && (
-                <div className="text-center text-sm text-gray-400 py-2 animate-pulse">
-                  Getting your location...
-                </div>
+                <div className="text-center text-sm text-gray-400 py-2 animate-pulse">Getting your location...</div>
               )}
-
               {gpsStatus === 'done' && coords && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
                     <span>✓</span>
                     <span className="font-medium">{locationLabel || 'Location captured'}</span>
                   </div>
-                  <p className="text-xs text-gray-400 ml-1">
-                    {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={captureGPS}
-                    className="text-xs text-gray-400 hover:text-gray-700 transition ml-1"
-                  >
+                  <p className="text-xs text-gray-400 ml-1">{coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}</p>
+                  <button type="button" onClick={captureGPS} className="text-xs text-gray-400 hover:text-gray-700 transition ml-1">
                     Recapture
                   </button>
                 </div>
               )}
-
               {gpsStatus === 'error' && (
                 <div className="space-y-2">
                   <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
-                    Location access denied. Please allow location access in your browser and try again.
+                    Location access denied. Please allow location access and try again.
                   </p>
-                  <button
-                    type="button"
-                    onClick={captureGPS}
-                    className="w-full border border-gray-200 text-gray-700 py-3 rounded-full text-sm hover:border-gray-900 transition"
-                  >
+                  <button type="button" onClick={captureGPS}
+                    className="w-full border border-gray-200 text-gray-700 py-3 rounded-full text-sm hover:border-gray-900 transition">
                     Try again
                   </button>
                 </div>
@@ -219,41 +188,41 @@ export default function ShopRegister() {
                 <p className="text-sm font-medium text-gray-900">Drop-off location</p>
                 <p className="text-xs text-gray-400 mt-0.5">Can customers drop buds off at your shop?</p>
               </div>
-              <button
-                type="button"
+              <button type="button"
                 onClick={() => setForm({ ...form, is_dropoff: !form.is_dropoff })}
-                className={`relative w-12 h-6 rounded-full transition-colors ${form.is_dropoff ? 'bg-gray-900' : 'bg-gray-200'}`}
-              >
+                className={`relative w-12 h-6 rounded-full transition-colors ${form.is_dropoff ? 'bg-gray-900' : 'bg-gray-200'}`}>
                 <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${form.is_dropoff ? 'translate-x-6' : 'translate-x-0'}`} />
               </button>
             </div>
           </div>
 
+          {/* Commission info — no flat prices */}
           <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-sm">
-            <p className="font-medium text-gray-900 mb-2">How commissions work</p>
-            <ul className="space-y-1.5 text-gray-500">
-              <li>• Platform fee: LKR 400 per match</li>
-              <li>• Your commission: 10% = LKR 40 per match</li>
-              <li>• Paid out after each confirmed match</li>
-            </ul>
+            <p className="font-medium text-gray-900 mb-3">How your commission works</p>
+            <div className="space-y-2 text-gray-500">
+              <div className="flex justify-between">
+                <span>Platform fee</span>
+                <span className="text-gray-700 font-medium">10% of agreed price</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Your share</span>
+                <span className="text-gray-700 font-medium">50% of platform fee</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-gray-200">
+                <span>Your effective cut</span>
+                <span className="text-gray-900 font-semibold">5% of agreed price</span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              Paid out after each confirmed match. Higher matches = more earnings.
+            </p>
           </div>
 
           {error && <p className="text-red-500 text-sm ml-1">{error}</p>}
 
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={
-              loading ||
-              !form.shop_name ||
-              !form.owner_name ||
-              !form.phone ||
-              !form.email ||
-              !form.registration_number ||
-              gpsStatus !== 'done'
-            }
-            className="bg-gray-900 text-white py-3.5 rounded-full font-medium hover:bg-black transition disabled:opacity-40 text-sm"
-          >
+          <button type="button" onClick={handleSubmit}
+            disabled={loading || !form.shop_name || !form.owner_name || !form.phone || !form.email || !form.registration_number || gpsStatus !== 'done'}
+            className="bg-gray-900 text-white py-3.5 rounded-full font-medium hover:bg-black transition disabled:opacity-40 text-sm">
             {loading ? 'Submitting...' : 'Apply now →'}
           </button>
 

@@ -11,7 +11,6 @@ type Shop = {
   phone: string
   location: string
   shop_code: string
-  commission_rate: number
   total_earned: number
   is_dropoff: boolean
   created_at: string
@@ -27,35 +26,62 @@ type Listing = {
   referral_earned: boolean
 }
 
+type MatchWithPrice = {
+  id: string
+  agreed_price: number | null
+  anchor_price: number
+  status: string
+  listing_a: string
+  listing_b: string
+}
+
 export default function ShopDashboard() {
   const { code } = useParams()
   const [shop, setShop] = useState<Shop | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
+  const [matches, setMatches] = useState<MatchWithPrice[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchShopData()
-  }, [code])
+  useEffect(() => { fetchShopData() }, [code])
 
   const fetchShopData = async () => {
     const { data: shopData } = await supabase
-      .from('shop_partners')
-      .select('*')
-      .eq('shop_code', code)
-      .single()
+      .from('shop_partners').select('*').eq('shop_code', code).single()
 
     if (!shopData) { setLoading(false); return }
     setShop(shopData)
 
     const { data: listingData } = await supabase
-      .from('listings')
-      .select('*')
-      .eq('shop_code', code)
+      .from('listings').select('*').eq('shop_code', code)
       .order('created_at', { ascending: false })
 
-    setListings(listingData ?? [])
+    const allListings = listingData ?? []
+    setListings(allListings)
+
+    // Fetch matches for matched listings to get agreed prices
+    const matchedIds = allListings.filter(l => l.matched).map(l => l.id)
+    if (matchedIds.length > 0) {
+      const { data: matchData } = await supabase
+        .from('matches').select('id, agreed_price, anchor_price, status, listing_a, listing_b')
+        .or(matchedIds.map(id => `listing_a.eq.${id},listing_b.eq.${id}`).join(','))
+      setMatches(matchData ?? [])
+    }
+
     setLoading(false)
   }
+
+  // Calculate commission for a listing: 5% of agreed price (50% of 10% platform fee)
+  const getCommission = (listing: Listing): number => {
+    const match = matches.find(m => m.listing_a === listing.id || m.listing_b === listing.id)
+    if (!match) return 0
+    const price = match.agreed_price ?? match.anchor_price
+    return Math.round(price * 0.05)
+  }
+
+  const matchedListings = listings.filter(l => l.matched)
+  const pendingListings = listings.filter(l => !l.matched)
+  const totalEarned = matchedListings.reduce((sum, l) => sum + getCommission(l), 0)
+  const pendingCount = pendingListings.length
 
   if (loading) return (
     <main className="min-h-screen bg-[#f5f5f0] flex items-center justify-center">
@@ -69,18 +95,12 @@ export default function ShopDashboard() {
         <p className="text-4xl mb-4">🔍</p>
         <p className="text-gray-700 font-semibold mb-2">Shop not found</p>
         <p className="text-gray-400 text-sm mb-6">Check your shop code and try again.</p>
-        <a href="/shop/register"
-          className="bg-gray-900 text-white px-6 py-2.5 rounded-full text-sm">
+        <a href="/shop/register" className="bg-gray-900 text-white px-6 py-2.5 rounded-full text-sm">
           Register your shop
         </a>
       </div>
     </main>
   )
-
-  const matchedListings = listings.filter(l => l.matched)
-  const pendingListings = listings.filter(l => !l.matched)
-  const totalEarned = matchedListings.length * 40
-  const pendingEarnings = pendingListings.length * 40
 
   return (
     <main className="min-h-screen bg-[#f5f5f0] relative">
@@ -108,7 +128,6 @@ export default function ShopDashboard() {
               <p className="text-xl font-bold tracking-widest">{shop.shop_code}</p>
             </div>
           </div>
-
           {shop.is_dropoff && (
             <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-medium">
               ✓ Drop-off point
@@ -120,7 +139,7 @@ export default function ShopDashboard() {
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center shadow-sm">
             <p className="text-2xl font-bold text-gray-900">
-              LKR {totalEarned.toLocaleString()}
+              {totalEarned > 0 ? `LKR ${totalEarned.toLocaleString()}` : '—'}
             </p>
             <p className="text-xs text-gray-400 mt-1">Total earned</p>
           </div>
@@ -129,10 +148,25 @@ export default function ShopDashboard() {
             <p className="text-xs text-gray-400 mt-1">Matches</p>
           </div>
           <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center shadow-sm">
-            <p className="text-2xl font-bold text-amber-600">
-              LKR {pendingEarnings.toLocaleString()}
-            </p>
+            <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
             <p className="text-xs text-gray-400 mt-1">Pending</p>
+          </div>
+        </div>
+
+        {/* Commission info */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-6 shadow-sm text-sm">
+          <p className="font-medium text-gray-900 mb-2">Your commission rate</p>
+          <div className="flex justify-between text-gray-500">
+            <span>Platform fee</span>
+            <span className="text-gray-700">10% of agreed price</span>
+          </div>
+          <div className="flex justify-between text-gray-500 mt-1">
+            <span>Your share</span>
+            <span className="text-gray-700">50% of platform fee</span>
+          </div>
+          <div className="flex justify-between font-semibold text-gray-900 mt-2 pt-2 border-t border-gray-100">
+            <span>Your effective cut</span>
+            <span>5% of each agreed price</span>
           </div>
         </div>
 
@@ -149,44 +183,50 @@ export default function ShopDashboard() {
           </div>
         </div>
 
-        {/* Listings from this shop */}
+        {/* Listings */}
         <h2 className="text-lg font-bold text-gray-900 mb-4">
           Listings via your code ({listings.length})
         </h2>
 
         {listings.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
-            <p className="text-gray-400 text-sm">
-              No listings yet. Start sharing your code!
-            </p>
+            <p className="text-gray-400 text-sm">No listings yet. Start sharing your code!</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {listings.map(listing => (
-              <div key={listing.id}
-                className="bg-white border border-gray-200 rounded-2xl p-5 flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-gray-900 text-sm">{listing.model}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {listing.has_component} → {listing.needs_component}
-                  </p>
+            {listings.map(listing => {
+              const commission = getCommission(listing)
+              return (
+                <div key={listing.id}
+                  className="bg-white border border-gray-200 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">{listing.model}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {listing.has_component} → {listing.needs_component}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {new Date(listing.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    {listing.matched ? (
+                      <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
+                        Matched ✓
+                      </span>
+                    ) : (
+                      <span className="text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full">
+                        Pending
+                      </span>
+                    )}
+                    {listing.matched && commission > 0 && (
+                      <p className="text-xs text-green-600 font-medium mt-1">
+                        +LKR {commission.toLocaleString()}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="text-right">
-                  {listing.matched ? (
-                    <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
-                      Matched ✓
-                    </span>
-                  ) : (
-                    <span className="text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full">
-                      Pending
-                    </span>
-                  )}
-                  {listing.matched && (
-                    <p className="text-xs text-green-600 font-medium mt-1">+LKR 40</p>
-                  )}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
