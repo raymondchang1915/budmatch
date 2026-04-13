@@ -12,14 +12,9 @@ type Listing = {
   condition: string
   location: string
   listing_type: string
+  asking_price: number | null
   matched: boolean
   created_at: string
-}
-
-const conditionColors: Record<string, string> = {
-  'Working perfectly': 'bg-green-100 text-green-700',
-  'Usable': 'bg-yellow-100 text-yellow-700',
-  'Unknown': 'bg-gray-100 text-gray-500',
 }
 
 export default function Browse() {
@@ -35,8 +30,6 @@ export default function Browse() {
 
   useEffect(() => { fetchListings() }, [])
   useEffect(() => { applyFilters() }, [listings, tab, search])
-
-  // auto fill email
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user?.email) setOfferEmail(data.user.email)
@@ -45,8 +38,7 @@ export default function Browse() {
 
   const fetchListings = async () => {
     const { data } = await supabase
-      .from('listings')
-      .select('*')
+      .from('listings').select('*')
       .order('created_at', { ascending: false })
     setListings(data ?? [])
     setLoading(false)
@@ -78,6 +70,12 @@ export default function Browse() {
     setOfferSent(true)
   }
 
+  const conditionDot: Record<string, string> = {
+    'Working perfectly': '#22c55e',
+    'Usable': '#f59e0b',
+    'Unknown': '#9ca3af',
+  }
+
   return (
     <main className="min-h-screen bg-[#f5f5f0] relative">
       <div className="absolute inset-0 pointer-events-none" style={{
@@ -85,38 +83,78 @@ export default function Browse() {
         backgroundSize: '32px 32px',
       }} />
 
-      <div className="relative max-w-3xl mx-auto px-6 py-16">
+      <div className="relative max-w-2xl mx-auto px-4 sm:px-6 py-16">
 
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-px w-8 bg-gray-400" />
-          <span className="text-sm text-gray-500 tracking-wide">Marketplace</span>
-        </div>
-        <div className="flex items-end justify-between mb-8">
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 32 }}>
           <div>
-            <h1 className="text-5xl font-bold text-gray-900 tracking-tight">Browse</h1>
-            <p className="text-gray-400 mt-2">{filtered.length} listing{filtered.length !== 1 ? 's' : ''}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <div style={{ height: 1, width: 28, background: '#999' }} />
+              <span style={{ fontSize: 11, color: '#999', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'system-ui' }}>
+                Marketplace
+              </span>
+            </div>
+            <h1 style={{
+              fontSize: 48, fontWeight: 700, color: '#111',
+              letterSpacing: '-1.5px', lineHeight: 1, marginBottom: 6,
+              fontFamily: 'system-ui, sans-serif',
+            }}>Browse</h1>
+            <p style={{ fontSize: 13, color: '#999', fontFamily: 'system-ui' }}>
+              {loading ? '—' : `${filtered.length} listing${filtered.length !== 1 ? 's' : ''}`}
+            </p>
           </div>
-          <a href="/listings/new"
-            className="bg-gray-900 text-white text-sm px-5 py-2.5 rounded-full hover:bg-black transition">
-            + Post listing
+          <a href="/listings/new" style={{
+            background: '#111', color: '#fff',
+            fontSize: 13, padding: '10px 20px',
+            borderRadius: 999, textDecoration: 'none',
+            fontWeight: 500, fontFamily: 'system-ui',
+            whiteSpace: 'nowrap',
+          }}>
+            + Post
           </a>
         </div>
 
         {/* Search */}
-        <input type="text"
-          placeholder="Search model, component, location..."
-          className="w-full bg-white border border-gray-200 rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 shadow-sm mb-4"
-          value={search}
-          onChange={e => setSearch(e.target.value)} />
+        <div style={{ position: 'relative', marginBottom: 12 }}>
+          <span style={{
+            position: 'absolute', left: 18, top: '50%',
+            transform: 'translateY(-50%)', color: '#bbb', fontSize: 14,
+          }}>⌕</span>
+          <input
+            type="text"
+            placeholder="Search model, component, location..."
+            style={{
+              width: '100%', background: '#fff',
+              border: '1px solid #e8e8e8', borderRadius: 999,
+              padding: '12px 18px 12px 40px', fontSize: 13,
+              outline: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              fontFamily: 'system-ui', color: '#333',
+              boxSizing: 'border-box',
+            }}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onFocus={e => (e.currentTarget.style.borderColor = '#999')}
+            onBlur={e => (e.currentTarget.style.borderColor = '#e8e8e8')}
+          />
+        </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-8 bg-white border border-gray-200 rounded-full p-1 shadow-sm">
+        <div style={{
+          display: 'flex', gap: 4, marginBottom: 24,
+          background: '#fff', border: '1px solid #e8e8e8',
+          borderRadius: 999, padding: 4,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+        }}>
           {(['selling', 'buying'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`flex-1 py-2 rounded-full text-sm font-medium transition ${
-                tab === t ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'
-              }`}>
+            <button key={t} type="button" onClick={() => setTab(t)} style={{
+              flex: 1, padding: '9px 0',
+              borderRadius: 999, fontSize: 13,
+              fontWeight: 500, border: 'none',
+              cursor: 'pointer', transition: 'all 0.15s',
+              background: tab === t ? '#111' : 'transparent',
+              color: tab === t ? '#fff' : '#888',
+              fontFamily: 'system-ui',
+            }}>
               {t === 'selling' ? 'For sale' : 'Looking for'}
             </button>
           ))}
@@ -124,60 +162,154 @@ export default function Browse() {
 
         {/* Listings */}
         {loading ? (
-          <div className="text-center py-20 text-gray-400">Loading...</div>
+          <div style={{ textAlign: 'center', padding: '80px 0', color: '#bbb', fontSize: 14 }}>
+            Loading...
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl border border-gray-200">
-            <p className="text-4xl mb-4">📭</p>
-            <p className="text-gray-500 mb-2">No listings found.</p>
-            <a href="/listings/new" className="text-gray-900 underline text-sm">
-              Post one
+          <div style={{
+            textAlign: 'center', padding: '80px 24px',
+            background: '#fff', borderRadius: 20,
+            border: '1px solid #e8e8e8',
+          }}>
+            <p style={{ fontSize: 32, marginBottom: 12 }}>📭</p>
+            <p style={{ fontSize: 14, color: '#888', marginBottom: 16, fontFamily: 'system-ui' }}>
+              No listings found
+            </p>
+            <a href="/listings/new" style={{
+              fontSize: 13, color: '#111',
+              textDecoration: 'underline', fontFamily: 'system-ui',
+            }}>
+              Post the first one
             </a>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {filtered.map(listing => (
-              <div key={listing.id}
-                className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-gray-400 transition">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h2 className="font-semibold text-gray-900">{listing.model}</h2>
-                    <p className="text-gray-400 text-xs mt-0.5">
+              <div key={listing.id} style={{
+                background: '#fff',
+                border: '1px solid #e8e8e8',
+                borderRadius: 20, padding: '20px 22px',
+                transition: 'border-color 0.15s, transform 0.15s, box-shadow 0.15s',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget
+                  el.style.borderColor = '#ccc'
+                  el.style.boxShadow = '0 4px 20px rgba(0,0,0,0.07)'
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget
+                  el.style.borderColor = '#e8e8e8'
+                  el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.03)'
+                }}
+              >
+                {/* Top row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+                    <h2 style={{
+                      fontSize: 15, fontWeight: 600, color: '#111',
+                      marginBottom: 3, fontFamily: 'system-ui',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>
+                      {listing.model}
+                    </h2>
+                    <p style={{ fontSize: 12, color: '#aaa', fontFamily: 'system-ui' }}>
                       📍 {listing.location || 'Location not set'}
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
+
+                  {/* Right badges */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
                     {listing.matched && (
-                      <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">
+                      <span style={{
+                        fontSize: 11, background: '#f0f9ff',
+                        color: '#0284c7', border: '1px solid #bae6fd',
+                        padding: '3px 10px', borderRadius: 999,
+                        fontWeight: 500, fontFamily: 'system-ui',
+                      }}>
                         Matched
                       </span>
                     )}
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                      conditionColors[listing.condition] ?? 'bg-gray-100 text-gray-500'
-                    }`}>
+                    <span style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      fontSize: 11, background: '#fafafa',
+                      border: '1px solid #f0f0f0',
+                      padding: '3px 10px', borderRadius: 999,
+                      fontFamily: 'system-ui', color: '#555',
+                    }}>
+                      <span style={{
+                        width: 6, height: 6, borderRadius: '50%',
+                        background: conditionDot[listing.condition] ?? '#ccc',
+                        display: 'inline-block', flexShrink: 0,
+                      }} />
                       {listing.condition}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex gap-2 mb-4 flex-wrap">
-                  <span className="bg-gray-50 border border-gray-100 rounded-full px-3 py-1 text-xs font-medium text-gray-800">
+                {/* Component tags */}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+                  <span style={{
+                    fontSize: 12, background: '#f5f5f5',
+                    border: '1px solid #ebebeb',
+                    color: '#333', padding: '4px 12px',
+                    borderRadius: 999, fontWeight: 500,
+                    fontFamily: 'system-ui',
+                  }}>
                     {listing.has_component}
                   </span>
                   {listing.has_case && (
-                    <span className="bg-blue-50 border border-blue-100 rounded-full px-3 py-1 text-xs font-medium text-blue-700">
+                    <span style={{
+                      fontSize: 12, background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      color: '#15803d', padding: '4px 12px',
+                      borderRadius: 999, fontWeight: 500,
+                      fontFamily: 'system-ui',
+                    }}>
                       + Case ✓
+                    </span>
+                  )}
+                  {listing.asking_price && (
+                    <span style={{
+                      fontSize: 12, background: '#fafafa',
+                      border: '1px solid #ebebeb',
+                      color: '#555', padding: '4px 12px',
+                      borderRadius: 999, fontFamily: 'system-ui',
+                    }}>
+                      LKR {listing.asking_price.toLocaleString()}
                     </span>
                   )}
                 </div>
 
-                <div className="flex gap-2">
-                  <a href={`/listings/${listing.id}`}
-                    className="flex-1 border border-gray-200 text-gray-700 text-xs py-2 rounded-full text-center hover:border-gray-400 transition">
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <a href={`/listings/${listing.id}`} style={{
+                    flex: 1, border: '1px solid #e8e8e8',
+                    color: '#555', fontSize: 12,
+                    padding: '9px 0', borderRadius: 999,
+                    textAlign: 'center', textDecoration: 'none',
+                    fontFamily: 'system-ui', fontWeight: 500,
+                    transition: 'border-color 0.15s',
+                  }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = '#999')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = '#e8e8e8')}
+                  >
                     View listing
                   </a>
                   <button
-                    onClick={() => { setOfferModal(listing); setOfferSent(false) }}
-                    className="flex-1 bg-gray-900 text-white text-xs py-2 rounded-full hover:bg-black transition">
+                    type="button"
+                    onClick={() => { setOfferModal(listing); setOfferSent(false); setOfferPrice('') }}
+                    style={{
+                      flex: 1, background: '#111',
+                      color: '#fff', fontSize: 12,
+                      padding: '9px 0', borderRadius: 999,
+                      border: 'none', cursor: 'pointer',
+                      fontFamily: 'system-ui', fontWeight: 500,
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#000')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#111')}
+                  >
                     Make offer
                   </button>
                 </div>
@@ -187,69 +319,117 @@ export default function Browse() {
         )}
       </div>
 
-      {/* Direct offer modal */}
+      {/* Offer modal */}
       {offerModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 100, padding: 16,
+          backdropFilter: 'blur(4px)',
+        }}
+          onClick={e => { if (e.target === e.currentTarget) setOfferModal(null) }}
+        >
+          <div style={{
+            background: '#fff', borderRadius: 24,
+            padding: 28, maxWidth: 380, width: '100%',
+            boxShadow: '0 24px 80px rgba(0,0,0,0.2)',
+          }}>
             {offerSent ? (
-              <div className="text-center">
-                <p className="text-3xl mb-3">✅</p>
-                <h3 className="font-bold text-gray-900 mb-2">Offer sent!</h3>
-                <p className="text-gray-400 text-sm mb-4">
-                  The seller will see your offer and contact you if interested.
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: 36, marginBottom: 12 }}>✅</p>
+                <h3 style={{ fontSize: 18, fontWeight: 600, color: '#111', marginBottom: 8, fontFamily: 'system-ui' }}>
+                  Offer sent!
+                </h3>
+                <p style={{ fontSize: 13, color: '#888', marginBottom: 20, fontFamily: 'system-ui' }}>
+                  The seller will see your offer and reach out if interested.
                 </p>
-                <button onClick={() => setOfferModal(null)}
-                  className="bg-gray-900 text-white px-6 py-2 rounded-full text-sm w-full">
+                <button type="button" onClick={() => setOfferModal(null)} style={{
+                  width: '100%', background: '#111', color: '#fff',
+                  padding: '12px 0', borderRadius: 999, border: 'none',
+                  fontSize: 13, cursor: 'pointer', fontFamily: 'system-ui',
+                }}>
                   Done
                 </button>
               </div>
             ) : (
               <>
-                <h3 className="font-bold text-gray-900 mb-1">Make a direct offer</h3>
-                <p className="text-gray-400 text-sm mb-4">
-                  {offerModal.model} — {offerModal.has_component}
-                  {offerModal.has_case ? ' + Case' : ''}
-                </p>
+                <div style={{ marginBottom: 20 }}>
+                  <h3 style={{ fontSize: 17, fontWeight: 600, color: '#111', marginBottom: 4, fontFamily: 'system-ui' }}>
+                    Make a direct offer
+                  </h3>
+                  <p style={{ fontSize: 13, color: '#888', fontFamily: 'system-ui' }}>
+                    {offerModal.model} — {offerModal.has_component}{offerModal.has_case ? ' + Case' : ''}
+                  </p>
+                </div>
 
-                <div className="flex flex-col gap-3 mb-4">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Your offer (LKR)
+                    <label style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 6, fontFamily: 'system-ui', letterSpacing: '0.05em' }}>
+                      YOUR OFFER (LKR)
                     </label>
-                    <input type="number"
-                      placeholder="e.g. 5000"
-                      className="w-full border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    <input type="number" placeholder="e.g. 5000" style={{
+                      width: '100%', border: '1px solid #e8e8e8',
+                      borderRadius: 999, padding: '11px 18px',
+                      fontSize: 13, outline: 'none',
+                      fontFamily: 'system-ui', boxSizing: 'border-box',
+                    }}
                       value={offerPrice}
-                      onChange={e => setOfferPrice(e.target.value)} />
+                      onChange={e => setOfferPrice(e.target.value)}
+                      onFocus={e => (e.currentTarget.style.borderColor = '#999')}
+                      onBlur={e => (e.currentTarget.style.borderColor = '#e8e8e8')}
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Your email
+                    <label style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 6, fontFamily: 'system-ui', letterSpacing: '0.05em' }}>
+                      YOUR EMAIL
                     </label>
-                    <input type="email"
-                      placeholder="you@email.com"
-                      className="w-full border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    <input type="email" placeholder="you@email.com" style={{
+                      width: '100%', border: '1px solid #e8e8e8',
+                      borderRadius: 999, padding: '11px 18px',
+                      fontSize: 13, outline: 'none',
+                      fontFamily: 'system-ui', boxSizing: 'border-box',
+                    }}
                       value={offerEmail}
-                      onChange={e => setOfferEmail(e.target.value)} />
+                      onChange={e => setOfferEmail(e.target.value)}
+                      onFocus={e => (e.currentTarget.style.borderColor = '#999')}
+                      onBlur={e => (e.currentTarget.style.borderColor = '#e8e8e8')}
+                    />
                   </div>
                 </div>
 
                 {offerModal.matched && (
-                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-4">
-                    <p className="text-xs text-amber-700">
-                      ⚠️ This listing is currently matched with someone. Your offer will only be considered if that deal falls through.
+                  <div style={{
+                    background: '#fffbeb', border: '1px solid #fde68a',
+                    borderRadius: 12, padding: '10px 14px', marginBottom: 16,
+                  }}>
+                    <p style={{ fontSize: 12, color: '#92400e', fontFamily: 'system-ui' }}>
+                      ⚠️ This listing already has a match. Your offer will be considered if that deal falls through.
                     </p>
                   </div>
                 )}
 
-                <div className="flex gap-2">
-                  <button onClick={() => setOfferModal(null)}
-                    className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-full text-sm hover:border-gray-400 transition">
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" onClick={() => setOfferModal(null)} style={{
+                    flex: 1, border: '1px solid #e8e8e8',
+                    background: 'transparent', color: '#555',
+                    padding: '11px 0', borderRadius: 999,
+                    fontSize: 13, cursor: 'pointer',
+                    fontFamily: 'system-ui',
+                  }}>
                     Cancel
                   </button>
-                  <button onClick={sendDirectOffer}
+                  <button type="button" onClick={sendDirectOffer}
                     disabled={!offerPrice || !offerEmail}
-                    className="flex-1 bg-gray-900 text-white py-2.5 rounded-full text-sm disabled:opacity-40 hover:bg-black transition">
+                    style={{
+                      flex: 1, background: !offerPrice || !offerEmail ? '#e0e0e0' : '#111',
+                      color: !offerPrice || !offerEmail ? '#aaa' : '#fff',
+                      padding: '11px 0', borderRadius: 999,
+                      border: 'none', fontSize: 13,
+                      cursor: !offerPrice || !offerEmail ? 'not-allowed' : 'pointer',
+                      fontFamily: 'system-ui', fontWeight: 500,
+                      transition: 'background 0.15s',
+                    }}>
                     Send offer
                   </button>
                 </div>
