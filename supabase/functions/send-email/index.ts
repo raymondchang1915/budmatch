@@ -1,6 +1,5 @@
 // supabase/functions/send-email/index.ts
-// Deploy with: supabase functions deploy send-email
-// Uses Resend (free tier: 100 emails/day) — sign up at resend.com, get an API key
+// Deploy: supabase functions deploy send-email
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 

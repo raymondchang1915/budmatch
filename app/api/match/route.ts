@@ -9,10 +9,10 @@ const supabase = createClient(
 type Listing = {
   id: string
   model: string
-  has_component: string  // 'Left bud' | 'Right bud'
+  has_component: string
   has_case: boolean
   needs_component: string
-  listing_type: string   // 'buying' | 'selling' | 'both'
+  listing_type: string
   condition: string
   location: string
   user_email: string
@@ -26,6 +26,84 @@ const CONDITION_SCORE: Record<string, number> = {
   'Working perfectly': 1.0,
   'Usable': 0.6,
   'Unknown': 0.3,
+}
+
+async function sendEmail(to: string, subject: string, html: string) {
+  try {
+    await supabase.functions.invoke('send-email', {
+      body: { to, subject, html },
+    })
+  } catch (e) {
+    console.error('Email error:', e)
+  }
+}
+
+async function createNotification(
+  userEmail: string,
+  type: string,
+  message: string,
+  listingId: string,
+  matchId: string
+) {
+  await supabase.from('notifications').insert([{
+    user_email: userEmail,
+    type,
+    message,
+    listing_id: listingId,
+    match_id: matchId,
+    read: false,
+  }])
+}
+
+async function notifyMatch(
+  buyer: Listing,
+  seller: Listing,
+  matchId: string,
+  anchorPrice: number
+) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://budmatch.vercel.app'
+  const model = buyer.model
+
+  // In-app notifications
+  await createNotification(
+    buyer.user_email,
+    'matched',
+    `You've been matched for your ${model}! Negotiate a price to proceed.`,
+    buyer.id,
+    matchId
+  )
+  await createNotification(
+    seller.user_email,
+    'matched',
+    `You've been matched for your ${model}! Negotiate a price to proceed.`,
+    seller.id,
+    matchId
+  )
+
+  // Email both parties
+  const emailHtml = (role: string, listingId: string) => `
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f5f5f0">
+      <div style="background:#fff;border-radius:20px;padding:32px;border:1px solid #e8e8e8">
+        <div style="width:48px;height:48px;background:#111;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:20px">
+          <span style="color:#22c55e;font-size:24px">✦</span>
+        </div>
+        <h2 style="color:#111;font-size:22px;margin:0 0 8px;font-weight:600">You've got a match!</h2>
+        <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 24px">
+          Your <strong>${model}</strong> listing has been matched.
+          You're the <strong>${role}</strong>. The starting price is
+          <strong>LKR ${anchorPrice.toLocaleString()}</strong> — head to BudMatch to negotiate.
+        </p>
+        <a href="${appUrl}/listings/${listingId}"
+           style="display:inline-block;background:#111;color:#fff;padding:12px 28px;border-radius:999px;text-decoration:none;font-size:13px;font-weight:500">
+          View match →
+        </a>
+        <p style="color:#bbb;font-size:11px;margin-top:28px">BudMatch · Sri Lanka</p>
+      </div>
+    </div>
+  `
+
+  await sendEmail(buyer.user_email, `Match found — ${model}`, emailHtml('buyer', buyer.id))
+  await sendEmail(seller.user_email, `Match found — ${model}`, emailHtml('seller', seller.id))
 }
 
 async function computePrice(listing: Listing, marketPrice: number): Promise<number> {
@@ -75,22 +153,16 @@ function compatible(a: Listing, b: Listing): boolean {
   )
 }
 
-// ── Assign buyer/seller roles within a compatible pair ─────────
-// Returns { buyer, seller } or null if neither wants to trade yet
 function assignRoles(
   a: Listing,
   b: Listing
 ): { buyer: Listing; seller: Listing; switchSuggested: boolean } | null {
-  const aType = a.listing_type  // 'buying' | 'selling' | 'both'
+  const aType = a.listing_type
   const bType = b.listing_type
 
-  // Clear case: one buying, one selling
   if (aType === 'buying' && bType === 'selling') return { buyer: a, seller: b, switchSuggested: false }
   if (aType === 'selling' && bType === 'buying') return { buyer: b, seller: a, switchSuggested: false }
 
-  // Ambiguous cases: both buying, both selling, one or both 'both'
-  // Whoever has higher asking price becomes buyer (willing to pay more)
-  // If prices equal or null, fall back to whoever listed first
   const priceA = a.asking_price ?? 0
   const priceB = b.asking_price ?? 0
 
@@ -117,7 +189,6 @@ async function runMatchingForModel(model: string) {
     .single()
   const marketPrice = mp?.market_price ?? 25000
 
-  // Build compatible edges
   const edges: { score: number; a: Listing; b: Listing }[] = []
   for (let i = 0; i < listings.length; i++) {
     for (let j = i + 1; j < listings.length; j++) {
@@ -131,7 +202,6 @@ async function runMatchingForModel(model: string) {
     }
   }
 
-  // Sort best matches first
   edges.sort((x, y) => y.score - x.score)
 
   const matchedIds = new Set<string>()
@@ -149,9 +219,9 @@ async function runMatchingForModel(model: string) {
     const sellerPrice = await computePrice(seller, marketPrice)
     const anchorPrice = Math.round((buyerPrice + sellerPrice) / 2)
 
-    await supabase.from('matches').insert([{
-      listing_a: seller.id,   // listing_a is always seller
-      listing_b: buyer.id,    // listing_b is always buyer
+    const { data: newMatch } = await supabase.from('matches').insert([{
+      listing_a: seller.id,
+      listing_b: buyer.id,
       status: 'pending',
       score: edge.score,
       anchor_price: anchorPrice,
@@ -162,10 +232,15 @@ async function runMatchingForModel(model: string) {
       seller_offer: anchorPrice,
       negotiation_status: 'pending',
       switch_suggested: switchSuggested,
-    }])
+    }]).select().single()
 
     await supabase.from('listings').update({ matched: true }).eq('id', buyer.id)
     await supabase.from('listings').update({ matched: true }).eq('id', seller.id)
+
+    // Send notifications and emails
+    if (newMatch) {
+      await notifyMatch(buyer, seller, newMatch.id, anchorPrice)
+    }
 
     matchedIds.add(edge.a.id)
     matchedIds.add(edge.b.id)

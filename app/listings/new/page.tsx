@@ -5,20 +5,49 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 const EARBUD_MODELS = [
-  'Apple AirPods Pro 2', 'Apple AirPods Pro 1', 'Apple AirPods 3', 'Apple AirPods 2',
-  'Samsung Galaxy Buds2 Pro', 'Samsung Galaxy Buds2', 'Samsung Galaxy Buds FE',
-  'Samsung Galaxy Buds Live', 'Samsung Galaxy Buds Plus',
+  // Apple
+  'Apple AirPods Pro 2', 'Apple AirPods Pro 1',
+  'Apple AirPods 4 ANC', 'Apple AirPods 4',
+  'Apple AirPods 3', 'Apple AirPods 2',
+  // Samsung
+  'Samsung Galaxy Buds3 Pro', 'Samsung Galaxy Buds3',
+  'Samsung Galaxy Buds2 Pro', 'Samsung Galaxy Buds2',
+  'Samsung Galaxy Buds FE', 'Samsung Galaxy Buds Live', 'Samsung Galaxy Buds Plus',
+  // Sony
   'Sony WF-1000XM5', 'Sony WF-1000XM4', 'Sony WF-C700N', 'Sony WF-C500',
-  'JBL Tour Pro 2', 'JBL Live Pro 2', 'JBL Tune Flex', 'JBL Tune 230NC', 'JBL Wave Flex',
+  // JBL
+  'JBL Tour Pro 2', 'JBL Live Pro 2',
+  'JBL Tune Flex', 'JBL Tune 230NC', 'JBL Wave Flex',
+  // Nothing / CMF
+  'Nothing Ear', 'Nothing Ear (2)', 'Nothing Ear (a)',
+  'CMF Buds Pro 2', 'CMF Buds Pro', 'CMF Buds 2', 'CMF Buds',
+  // Soundcore (Anker)
+  'Soundcore Liberty 4 Pro', 'Soundcore Liberty 4 NC', 'Soundcore Liberty 4',
+  'Soundcore Liberty 3 Pro', 'Soundcore Space A40',
+  'Soundcore Life P3', 'Soundcore Life P2',
+  'Soundcore P40i', 'Soundcore P30i', 'Soundcore A30i',
+  // Realme
   'Realme Buds Air 5 Pro', 'Realme Buds Air 5', 'Realme Buds Air 3',
   'Realme Buds T300', 'Realme Buds T100',
+  // OnePlus
   'OnePlus Buds Pro 2', 'OnePlus Buds Pro', 'OnePlus Buds Z2',
-  'Xiaomi Redmi Buds 5 Pro', 'Xiaomi Redmi Buds 5', 'Xiaomi Redmi Buds 4 Pro', 'Xiaomi Buds 4',
+  // Xiaomi / Redmi
+  'Xiaomi Redmi Buds 6 Pro', 'Xiaomi Redmi Buds 6',
+  'Xiaomi Redmi Buds 5 Pro', 'Xiaomi Redmi Buds 5',
+  'Xiaomi Redmi Buds 4 Pro', 'Xiaomi Buds 4',
+  // Oppo
   'Oppo Enco X2', 'Oppo Enco Air 3 Pro', 'Oppo Enco Air 3', 'Oppo Enco Buds 2',
-  'Huawei FreeBuds Pro 3', 'Huawei FreeBuds Pro 2', 'Huawei FreeBuds 5i', 'Huawei FreeBuds 4i',
-  'Soundcore Liberty 4', 'Soundcore Liberty 4 NC', 'Soundcore Life P3', 'Soundcore Space A40',
+  // Huawei
+  'Huawei FreeBuds Pro 3', 'Huawei FreeBuds Pro 2',
+  'Huawei FreeBuds 5i', 'Huawei FreeBuds 4i',
+  // Haylou
+  'Haylou X1 Pro', 'Haylou X1 2023', 'Haylou GT7',
+  // Jabra
   'Jabra Elite 10', 'Jabra Elite 8 Active', 'Jabra Elite 4',
+  // Bose
   'Bose QuietComfort Earbuds 2', 'Bose QuietComfort Earbuds',
+  'Bose Ultra Open Earbuds',
+  // Other
   'Other',
 ]
 
@@ -26,7 +55,9 @@ const CONDITIONS = ['Working perfectly', 'Usable', 'Unknown']
 
 const DEFAULT_MARKET_PRICES: Record<string, number> = {
   'Apple AirPods Pro 2': 95000, 'Apple AirPods Pro 1': 65000,
+  'Apple AirPods 4 ANC': 62000, 'Apple AirPods 4': 52000,
   'Apple AirPods 3': 55000, 'Apple AirPods 2': 35000,
+  'Samsung Galaxy Buds3 Pro': 55000, 'Samsung Galaxy Buds3': 38000,
   'Samsung Galaxy Buds2 Pro': 45000, 'Samsung Galaxy Buds2': 28000,
   'Samsung Galaxy Buds FE': 22000, 'Samsung Galaxy Buds Live': 20000,
   'Samsung Galaxy Buds Plus': 18000,
@@ -34,19 +65,28 @@ const DEFAULT_MARKET_PRICES: Record<string, number> = {
   'Sony WF-C700N': 32000, 'Sony WF-C500': 22000,
   'JBL Tour Pro 2': 48000, 'JBL Live Pro 2': 35000,
   'JBL Tune Flex': 18000, 'JBL Tune 230NC': 14000, 'JBL Wave Flex': 12000,
+  'Nothing Ear': 42000, 'Nothing Ear (2)': 38000, 'Nothing Ear (a)': 25000,
+  'CMF Buds Pro 2': 15000, 'CMF Buds Pro': 14000,
+  'CMF Buds 2': 9000, 'CMF Buds': 7500,
+  'Soundcore Liberty 4 Pro': 32000, 'Soundcore Liberty 4 NC': 18000,
+  'Soundcore Liberty 4': 22000, 'Soundcore Liberty 3 Pro': 28000,
+  'Soundcore Space A40': 16000, 'Soundcore Life P3': 12000,
+  'Soundcore Life P2': 10000, 'Soundcore P40i': 17000,
+  'Soundcore P30i': 14000, 'Soundcore A30i': 9500,
   'Realme Buds Air 5 Pro': 18000, 'Realme Buds Air 5': 14000,
   'Realme Buds Air 3': 10000, 'Realme Buds T300': 8000, 'Realme Buds T100': 5000,
   'OnePlus Buds Pro 2': 28000, 'OnePlus Buds Pro': 20000, 'OnePlus Buds Z2': 12000,
+  'Xiaomi Redmi Buds 6 Pro': 20000, 'Xiaomi Redmi Buds 6': 14000,
   'Xiaomi Redmi Buds 5 Pro': 16000, 'Xiaomi Redmi Buds 5': 12000,
   'Xiaomi Redmi Buds 4 Pro': 14000, 'Xiaomi Buds 4': 18000,
   'Oppo Enco X2': 32000, 'Oppo Enco Air 3 Pro': 18000,
   'Oppo Enco Air 3': 12000, 'Oppo Enco Buds 2': 8000,
   'Huawei FreeBuds Pro 3': 48000, 'Huawei FreeBuds Pro 2': 38000,
   'Huawei FreeBuds 5i': 22000, 'Huawei FreeBuds 4i': 18000,
-  'Soundcore Liberty 4': 22000, 'Soundcore Liberty 4 NC': 18000,
-  'Soundcore Life P3': 12000, 'Soundcore Space A40': 16000,
+  'Haylou X1 Pro': 12000, 'Haylou X1 2023': 8500, 'Haylou GT7': 6000,
   'Jabra Elite 10': 55000, 'Jabra Elite 8 Active': 38000, 'Jabra Elite 4': 22000,
   'Bose QuietComfort Earbuds 2': 75000, 'Bose QuietComfort Earbuds': 55000,
+  'Bose Ultra Open Earbuds': 65000,
   'Other': 10000,
 }
 
