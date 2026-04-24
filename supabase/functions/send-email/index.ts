@@ -15,7 +15,7 @@ serve(async (req) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'BudMatch <noreply@budmatch.vercel.app>',
+      from: 'BudMatch <onboarding@resend.dev>',
       to,
       subject,
       html,
