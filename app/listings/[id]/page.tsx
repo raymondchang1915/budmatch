@@ -37,6 +37,7 @@ type Match = {
   seller_paid: boolean
   switch_suggested: boolean
   payment_deadline: string | null
+  renegotiation_count: number
 }
 
 type Message = {
@@ -164,34 +165,83 @@ export default function ListingDetail() {
     setNegotiating(false)
   }
 
+  async function handleRenegotiate() {
+  if (!match || !myRole) return
+  setNegotiating(true)
+ 
+  const res = await fetch('/api/negotiate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ match_id: match.id, action: 'renegotiate', role: myRole }),
+  })
+  const data = await res.json()
+ 
+  if (data.error) {
+    alert(data.error)
+    setNegotiating(false)
+    return
+  }
+ 
+  const { data: fresh } = await supabase.from('matches').select('*').eq('id', match.id).single()
+  if (fresh) setMatch(fresh)
+  setNegotiating(false)
+}
+
   async function handlePayment() {
   if (!currentUser || !match || !myRole) return
   setPaying(true)
-
-  // Mark this user as paid directly — PayHere skipped for now
+ 
   const field = myRole === 'buyer' ? 'buyer_paid' : 'seller_paid'
   await supabase.from('matches').update({ [field]: true }).eq('id', match.id)
-
-  // Check if both paid
+ 
   const updatedBuyerPaid = myRole === 'buyer' ? true : match.buyer_paid
   const updatedSellerPaid = myRole === 'seller' ? true : match.seller_paid
-
+ 
   if (updatedBuyerPaid && updatedSellerPaid) {
     await supabase.from('matches').update({ status: 'paid' }).eq('id', match.id)
+  } else {
+    // Notify the other party that this side has paid
+    await fetch('/api/negotiate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ match_id: match.id, action: 'notify_payment', role: myRole }),
+    })
   }
-
-  // Reload match
+ 
   const { data: fresh } = await supabase.from('matches').select('*').eq('id', match.id).single()
   if (fresh) setMatch(fresh)
   setPaying(false)
-  }
+}
+ 
+  
 
   async function sendMessage() {
     if (!newMessage.trim() || !match?.id || !currentUser) return
     setSending(true)
+
     await supabase.from('messages').insert([{
       match_id: match.id, sender_email: currentUser, content: newMessage.trim(),
     }])
+
+    const otherEmail = currentUser === sellerListing?.user_email
+      ? buyerListing?.user_email
+      : sellerListing?.user_email
+
+    const otherListingId = currentUser === sellerListing?.user_email
+      ? buyerListing?.id
+      : sellerListing?.id
+
+    if (otherEmail && otherListingId) {
+      await supabase.from('notifications').insert([{
+        user_email: otherEmail,
+        type: 'new_message',
+        message: `New message from ${currentUser.split('@')[0]}: "${newMessage.trim().slice(0, 60)}${newMessage.trim().length > 60 ? '...' : ''}"`,
+        listing_id: otherListingId,
+        match_id: match.id,
+        read: false,
+      }])
+    }
+
     setNewMessage('')
     setSending(false)
   }
@@ -504,6 +554,27 @@ export default function ListingDetail() {
                     <p className="text-sm text-center text-gray-400">
                       You're confirmed. The other side has 1 hour to pay or the match is cancelled.
                     </p>
+                  )}
+
+                  {match.negotiation_status === 'agreed' && myRole && !bothPaid && (
+                    <div className="pt-2 border-t border-gray-100">
+                      <p className="text-xs text-gray-400 text-center mb-2">
+                        Changed your mind?{' '}
+                        {(match.renegotiation_count ?? 0) < 3
+                          ? `You can renegotiate ${3 - (match.renegotiation_count ?? 0)} more time${3 - (match.renegotiation_count ?? 0) === 1 ? '' : 's'}.`
+                          : 'No more renegotiations allowed.'}
+                      </p>
+                      {(match.renegotiation_count ?? 0) < 3 && (
+                        <button
+                          type="button"
+                          onClick={handleRenegotiate}
+                          disabled={negotiating}
+                          className="w-full border border-gray-200 text-gray-500 py-2.5 rounded-full text-sm hover:border-gray-400 transition disabled:opacity-40"
+                        >
+                          Renegotiate price
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

@@ -105,7 +105,11 @@ export default function Navbar() {
     ?? user?.email?.split('@')[0]
     ?? null
 
-  const notifIcon = (type: string) => type === 'matched' ? '⚡' : '🤝'
+  const notifIcon = (type: string) =>
+    type === 'matched' ? '⚡' :
+    type === 'deal_agreed' ? '🤝' :
+    type === 'partner_paid' ? '💳' :
+    type === 'new_message' ? '💬' : '🔔'
 
   return (
     <>
