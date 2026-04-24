@@ -56,7 +56,7 @@ async function notifyDealAgreed(matchId: string, agreedPrice: number) {
   const { sellerListing, buyerListing } = listings
 
   const model = sellerListing.model
-  const fee = Math.max(100, Math.round(agreedPrice * 0.05))
+  const fee = Math.max(100, Math.round(agreedPrice * 0.10))
   const message = `Deal agreed at LKR ${agreedPrice.toLocaleString()} for ${model}. Pay LKR ${fee.toLocaleString()} to unlock chat.`
 
   await createNotification(sellerListing.user_email, 'deal_agreed', message, sellerListing.id, matchId)
@@ -149,12 +149,13 @@ export async function POST(req: NextRequest) {
 
     // Reset to offset anchors so there's room to move
     const anchor = match.anchor_price
+    const spread = Math.max(300, Math.round(anchor * 0.10))
     await supabase.from('matches').update({
       negotiation_status: 'pending',
       status: 'pending',
       agreed_price: null,
-      buyer_offer: anchor - 300,
-      seller_offer: anchor + 300,
+      buyer_offer: anchor - spread,
+      seller_offer: anchor + spread,
       renegotiation_count: count + 1,
     }).eq('id', match_id)
 
@@ -171,7 +172,8 @@ export async function POST(req: NextRequest) {
 
   const step = 100
   const field = role === 'buyer' ? 'buyer_offer' : 'seller_offer'
-  const current = match[field] ?? (role === 'buyer' ? match.anchor_price - 300 : match.anchor_price + 300)
+  const defaultSpread = Math.max(300, Math.round(match.anchor_price * 0.10))
+  const current = match[field] ?? (role === 'buyer' ? match.anchor_price - defaultSpread : match.anchor_price + defaultSpread)
 
   const newOffer = direction === 'up'
     ? Math.min(current + step, match.ladder_max)
@@ -179,8 +181,8 @@ export async function POST(req: NextRequest) {
 
   await supabase.from('matches').update({ [field]: newOffer }).eq('id', match_id)
 
-  const buyerOffer = role === 'buyer' ? newOffer : (match.buyer_offer ?? match.anchor_price - 300)
-  const sellerOffer = role === 'seller' ? newOffer : (match.seller_offer ?? match.anchor_price + 300)
+  const buyerOffer = role === 'buyer' ? newOffer : (match.buyer_offer ?? match.anchor_price - defaultSpread)
+  const sellerOffer = role === 'seller' ? newOffer : (match.seller_offer ?? match.anchor_price + defaultSpread)
 
   // Auto-agree when offers meet
   if (buyerOffer >= sellerOffer) {

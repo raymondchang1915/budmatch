@@ -78,7 +78,7 @@ export default function ListingDetail() {
 
   // Agreed price and fee (10% split equally = 5% each)
   const agreedPrice = match?.agreed_price ?? match?.anchor_price ?? 0
-  const myFee = Math.max(100, Math.round(agreedPrice * 0.05))
+  const myFee = Math.max(100, Math.round(agreedPrice * 0.10))
 
   // Payment deadline countdown
   useEffect(() => {
