@@ -130,6 +130,36 @@ export default function ListingDetail() {
     return () => { supabase.removeChannel(channel) }
   }, [match?.id])
 
+  useEffect(() => {
+    if (!match?.id) return
+
+    const channel = supabase
+      .channel(`match-updates:${match.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'matches',
+        filter: `id=eq.${match.id}`,
+      }, (payload) => {
+        const updated = payload.new as Match
+        setMatch(updated)
+
+        if (
+          updated.buyer_locked &&
+          updated.seller_locked &&
+          updated.negotiation_status !== 'agreed' &&
+          updated.buyer_offer >= updated.seller_offer
+        ) {
+          const midpoint = Math.round((updated.buyer_offer + updated.seller_offer) / 2 / 100) * 100
+          const renegsLeft = MAX_RENEGOTIATIONS - (updated.renegotiation_count ?? 0)
+          setMidpointModal({ midpoint, renegotiationsLeft: renegsLeft })
+        }
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [match?.id])
+
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   async function loadData() {
