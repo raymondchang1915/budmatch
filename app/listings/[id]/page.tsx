@@ -155,7 +155,9 @@ export default function ListingDetail() {
           setMidpointModal({ midpoint, renegotiationsLeft: renegsLeft })
         }
       })
-      .subscribe()
+      .subscribe((status) => {
+        console.log('Match subscription status:', status)
+      })
 
     return () => { supabase.removeChannel(channel) }
   }, [match?.id])
