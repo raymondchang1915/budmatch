@@ -359,7 +359,14 @@ export default function ListingDetail() {
       {midpointModal && match && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4"
           style={{ backdropFilter: 'blur(4px)' }}>
-          <div className="bg-white rounded-2xl p-7 max-w-sm w-full shadow-xl">
+          <div className="bg-white rounded-2xl p-7 max-w-sm w-full shadow-xl relative">
+            <button
+              type="button"
+              onClick={() => setMidpointModal(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-lg leading-none"
+            >
+              ✕
+            </button>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Both sides locked in 🔒</h3>
             <p className="text-sm text-gray-500 mb-1">
               Your offer: <strong>LKR {myOffer.toLocaleString()}</strong> · Their offer: <strong>LKR {theirOffer.toLocaleString()}</strong>
@@ -529,6 +536,13 @@ export default function ListingDetail() {
                   </div>
                 </div>
 
+                {(match.renegotiation_count ?? 0) > 0 && match.negotiation_status !== 'agreed' && (
+                  <div className="mx-6 mt-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
+                    <p className="font-medium mb-0.5">Renegotiation round {match.renegotiation_count} of {MAX_RENEGOTIATIONS}</p>
+                    <p>One side didn't agree to the midpoint price. Prices have been reset to your last locked offers. {renegsLeft} renegotiation{renegsLeft === 1 ? '' : 's'} left after this.</p>
+                  </div>
+                )}
+
                 <div className="p-6 grid grid-cols-2 gap-4 text-sm">
                   <div className={`rounded-xl p-4 space-y-1 ${isBuyer ? 'ring-2 ring-gray-900 bg-gray-50' : 'bg-gray-50'}`}>
                     <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
@@ -617,6 +631,61 @@ export default function ListingDetail() {
                         )}
                       </div>
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Inline locked card — shows when modal is dismissed */}
+            {match.buyer_locked && match.seller_locked && match.negotiation_status !== 'agreed' && !midpointModal && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Both sides locked in 🔒</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Midpoint: LKR {(Math.round(((match.buyer_offer ?? match.anchor_price) + (match.seller_offer ?? match.anchor_price)) / 2 / 100) * 100).toLocaleString()}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setMidpointModal({
+                    midpoint: Math.round(((match.buyer_offer ?? match.anchor_price) + (match.seller_offer ?? match.anchor_price)) / 2 / 100) * 100,
+                    renegotiationsLeft: renegsLeft,
+                  })}
+                    className="text-xs text-gray-900 border border-gray-200 px-3 py-1.5 rounded-full hover:border-gray-400 transition">
+                    View details
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                  <div className={`rounded-xl px-3 py-2.5 text-center border ${
+                    iConfirmed ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-400'
+                  }`}>
+                    {iConfirmed ? '✓ You confirmed' : 'You — pending'}
+                  </div>
+                  <div className={`rounded-xl px-3 py-2.5 text-center border ${
+                    theyConfirmed ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-400'
+                  }`}>
+                    {theyConfirmed ? '✓ They confirmed' : 'Them — pending'}
+                  </div>
+                </div>
+
+                {iConfirmed && !theyConfirmed && (
+                  <p className="text-xs text-gray-400 text-center">
+                    Waiting for them to confirm — you can use the app in the meantime.
+                  </p>
+                )}
+
+                {!iConfirmed && (
+                  <div className="flex gap-2 mt-1">
+                    {renegsLeft > 0 && (
+                      <button type="button" onClick={handleRenegotiate} disabled={negotiating}
+                        className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-full text-sm hover:border-gray-400 transition disabled:opacity-40">
+                        Renegotiate
+                      </button>
+                    )}
+                    <button type="button" onClick={handleConfirmMidpoint} disabled={negotiating}
+                      className="flex-1 bg-gray-900 text-white py-2.5 rounded-full text-sm font-medium hover:bg-black transition disabled:opacity-40">
+                      Confirm
+                    </button>
                   </div>
                 )}
               </div>
