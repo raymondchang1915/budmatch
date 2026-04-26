@@ -39,6 +39,10 @@ type Match = {
   seller_paid: boolean
   buyer_locked: boolean
   seller_locked: boolean
+  buyer_confirmed: boolean
+  seller_confirmed: boolean
+  last_buyer_offer: number | null
+  last_seller_offer: number | null
   switch_suggested: boolean
   payment_deadline: string | null
   renegotiation_count: number
@@ -80,6 +84,8 @@ export default function ListingDetail() {
   const userHasPaid = match ? (myRole === 'buyer' ? match.buyer_paid : match.seller_paid) : false
   const chatUnlocked = bothPaid
   const isLocked = match ? (myRole === 'buyer' ? match.buyer_locked : match.seller_locked) : false
+  const iConfirmed = match ? (myRole === 'buyer' ? match.buyer_confirmed : match.seller_confirmed) : false
+  const theyConfirmed = match ? (myRole === 'buyer' ? match.seller_confirmed : match.buyer_confirmed) : false
 
   const agreedPrice = match?.agreed_price ?? match?.anchor_price ?? 0
   const myFee = Math.max(100, Math.round(agreedPrice * 0.10))
@@ -91,7 +97,8 @@ export default function ListingDetail() {
   const myOffer = match ? (myRole === 'buyer' ? match.buyer_offer : match.seller_offer) : 0
   const theirOffer = match ? (myRole === 'buyer' ? match.seller_offer : match.buyer_offer) : 0
 
-  // Helper to trigger midpoint modal from any updated match
+  const theyLockedIn = match ? (myRole === 'buyer' ? match.seller_locked : match.buyer_locked) : false
+
   function checkBothLocked(updated: Match) {
     if (
       updated.buyer_locked &&
@@ -103,6 +110,12 @@ export default function ListingDetail() {
       const midpoint = Math.round((buyerOffer + sellerOffer) / 2 / 100) * 100
       const renegsRemaining = MAX_RENEGOTIATIONS - (updated.renegotiation_count ?? 0)
       setMidpointModal({ midpoint, renegotiationsLeft: renegsRemaining })
+    } else if (
+      updated.negotiation_status === 'agreed' ||
+      !updated.buyer_locked ||
+      !updated.seller_locked
+    ) {
+      setMidpointModal(null)
     }
   }
 
@@ -143,15 +156,13 @@ export default function ListingDetail() {
     return () => { supabase.removeChannel(channel) }
   }, [match?.id])
 
-  // Match realtime — detects when other side locks, price changes, deal agreed
+  // Match realtime
   useEffect(() => {
     if (!match?.id) return
     const channel = supabase
       .channel(`match-updates:${match.id}`)
       .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'matches',
+        event: 'UPDATE', schema: 'public', table: 'matches',
         filter: `id=eq.${match.id}`,
       }, (payload) => {
         const updated = payload.new as Match
@@ -159,12 +170,14 @@ export default function ListingDetail() {
         checkBothLocked(updated)
       })
       .subscribe((status) => {
-        console.log('Match realtime status:', status)
+        console.log('Match realtime:', status)
       })
     return () => { supabase.removeChannel(channel) }
   }, [match?.id])
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   async function loadData() {
     const { data: listingData } = await supabase.from('listings').select('*').eq('id', id).single()
@@ -183,7 +196,6 @@ export default function ListingDetail() {
       const { data: bl } = await supabase.from('listings').select('*').eq('id', matchData.listing_b).single()
       if (sl) setSellerListing(sl)
       if (bl) setBuyerListing(bl)
-      // If already both locked on load, show modal immediately
       checkBothLocked(matchData)
     }
     setLoading(false)
@@ -228,25 +240,22 @@ export default function ListingDetail() {
     const data = await res.json()
     await refreshMatch()
     setNegotiating(false)
-
-    // Handle forced confirm (3rd renegotiation)
-    if (data.both_locked && data.forced) {
-      await refreshMatch()
-    }
-    // both_locked but not forced — modal will fire via checkBothLocked in refreshMatch
+    // forced confirm on 3rd round handled by refreshMatch → checkBothLocked
   }
 
   async function handleConfirmMidpoint() {
-    if (!match) return
-    setMidpointModal(null)
+    if (!match || !myRole) return
     setNegotiating(true)
-    await fetch('/api/negotiate', {
+    const res = await fetch('/api/negotiate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ match_id: match.id, action: 'confirm_midpoint' }),
+      body: JSON.stringify({ match_id: match.id, action: 'confirm_midpoint', role: myRole }),
     })
+    const data = await res.json()
     await refreshMatch()
     setNegotiating(false)
+    if (data.agreed) setMidpointModal(null)
+    // if waiting → keep modal open, realtime will update confirmed status
   }
 
   async function handleRenegotiate() {
@@ -347,30 +356,56 @@ export default function ListingDetail() {
       }} />
 
       {/* Midpoint modal */}
-      {midpointModal && (
+      {midpointModal && match && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4"
           style={{ backdropFilter: 'blur(4px)' }}>
           <div className="bg-white rounded-2xl p-7 max-w-sm w-full shadow-xl">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Both sides locked in 🔒</h3>
             <p className="text-sm text-gray-500 mb-1">
-              Your offers: <strong>LKR {myOffer.toLocaleString()}</strong> (you) vs <strong>LKR {theirOffer.toLocaleString()}</strong> (them)
+              Your offer: <strong>LKR {myOffer.toLocaleString()}</strong> · Their offer: <strong>LKR {theirOffer.toLocaleString()}</strong>
             </p>
-            <p className="text-sm text-gray-500 mb-5">
-              Confirm at the midpoint of <strong className="text-gray-900">LKR {midpointModal.midpoint.toLocaleString()}</strong>?
+            <p className="text-sm text-gray-500 mb-4">
+              Midpoint: <strong className="text-gray-900">LKR {midpointModal.midpoint.toLocaleString()}</strong>
+            </p>
+
+            {/* Confirm status */}
+            <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
+              <div className={`rounded-xl px-3 py-2.5 text-center border ${
+                iConfirmed ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-400'
+              }`}>
+                {iConfirmed ? '✓ You confirmed' : 'You — pending'}
+              </div>
+              <div className={`rounded-xl px-3 py-2.5 text-center border ${
+                theyConfirmed ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-400'
+              }`}>
+                {theyConfirmed ? '✓ They confirmed' : 'Them — pending'}
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-400 mb-5">
               {midpointModal.renegotiationsLeft > 0
-                ? ` Or renegotiate (${midpointModal.renegotiationsLeft} time${midpointModal.renegotiationsLeft === 1 ? '' : 's'} left).`
-                : ' No more renegotiations — you must confirm.'}
+                ? `Either side can renegotiate (${midpointModal.renegotiationsLeft} left). Both must confirm to proceed.`
+                : 'Final round — both must confirm to proceed.'}
             </p>
+
             <div className="flex gap-3">
               {midpointModal.renegotiationsLeft > 0 && (
-                <button type="button" onClick={handleRenegotiate}
-                  className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-full text-sm hover:border-gray-400 transition">
+                <button type="button" onClick={handleRenegotiate} disabled={negotiating}
+                  className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-full text-sm hover:border-gray-400 transition disabled:opacity-40">
                   Renegotiate
                 </button>
               )}
-              <button type="button" onClick={handleConfirmMidpoint}
-                className="flex-1 bg-gray-900 text-white py-2.5 rounded-full text-sm font-medium hover:bg-black transition">
-                Confirm LKR {midpointModal.midpoint.toLocaleString()}
+              <button
+                type="button"
+                onClick={handleConfirmMidpoint}
+                disabled={negotiating || iConfirmed}
+                className={`flex-1 py-2.5 rounded-full text-sm font-medium transition ${
+                  iConfirmed
+                    ? 'bg-green-100 text-green-700 border border-green-200'
+                    : 'bg-gray-900 text-white hover:bg-black disabled:opacity-40'
+                }`}
+              >
+                {iConfirmed ? '✓ Confirmed — waiting...' : `Confirm LKR ${midpointModal.midpoint.toLocaleString()}`}
               </button>
             </div>
           </div>
@@ -536,26 +571,22 @@ export default function ListingDetail() {
 
                 {/* Controls */}
                 {myRole && (
-                  <div className="px-6 pb-6 space-y-3">
+                  <div className="px-6 pb-6">
                     <div className="bg-gray-50 rounded-xl p-4">
-                      <p className="text-xs text-gray-500 mb-1">
+                      <p className="text-xs text-gray-500 mb-0.5">
                         Your offer: <strong className="text-gray-900">LKR {myOffer.toLocaleString()}</strong>
-                        {isLocked && <span className="ml-2 text-green-600 text-xs">🔒 Locked</span>}
-                      </p>
-                      <p className="text-xs text-gray-400 mb-1">
-                        Their offer: LKR {theirOffer.toLocaleString()}
-                        {match.buyer_locked && match.seller_locked === false && myRole === 'seller' && (
-                          <span className="ml-2 text-amber-600">— they've locked in, waiting for you</span>
-                        )}
-                        {match.seller_locked && match.buyer_locked === false && myRole === 'buyer' && (
-                          <span className="ml-2 text-amber-600">— they've locked in, waiting for you</span>
-                        )}
+                        {isLocked && <span className="ml-2 text-green-600">🔒 Locked</span>}
                       </p>
                       <p className="text-xs text-gray-400 mb-3">
-                        {match.buyer_locked && !match.seller_locked && myRole === 'buyer' && '✓ You locked in — waiting for the seller'}
-                        {match.seller_locked && !match.buyer_locked && myRole === 'seller' && '✓ You locked in — waiting for the buyer'}
+                        Their offer: LKR {theirOffer.toLocaleString()}
+                        {theyLockedIn && !isLocked && (
+                          <span className="ml-2 text-amber-600">— locked, waiting for you</span>
+                        )}
+                        {theyLockedIn && isLocked && (
+                          <span className="ml-2 text-green-600">— also locked</span>
+                        )}
                       </p>
-                      <div className="flex gap-2 mb-3">
+                      <div className="flex gap-2 mb-2">
                         <button type="button" onClick={() => handleNegotiate('down')}
                           disabled={negotiating || isLocked}
                           className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-full text-sm font-medium hover:border-gray-400 transition disabled:opacity-40">
@@ -679,7 +710,9 @@ export default function ListingDetail() {
               {!chatUnlocked ? (
                 <div className="px-7 py-12 text-center text-gray-400 text-sm">
                   <div className="text-3xl mb-3">🔒</div>
-                  <p>{match.negotiation_status !== 'agreed' ? 'Agree on a price above to proceed.' : 'Complete payment above to unlock chat.'}</p>
+                  <p>{match.negotiation_status !== 'agreed'
+                    ? 'Agree on a price above to proceed.'
+                    : 'Complete payment above to unlock chat.'}</p>
                 </div>
               ) : (
                 <>

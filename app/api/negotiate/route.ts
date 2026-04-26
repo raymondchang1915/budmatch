@@ -9,14 +9,10 @@ const supabase = createClient(
 const MAX_RENEGOTIATIONS = 3
 const APPURL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://budmatch.vercel.app'
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
 async function sendEmail(to: string, subject: string, html: string) {
   try {
     await supabase.functions.invoke('send-email', { body: { to, subject, html } })
-  } catch (e) {
-    console.error('Email error:', e)
-  }
+  } catch (e) { console.error('Email error:', e) }
 }
 
 async function createNotification(
@@ -41,7 +37,6 @@ async function getBothListings(matchId: string) {
   return { sellerListing: sl, buyerListing: bl }
 }
 
-// ── Notify deal confirmed → pay ───────────────────────────────────────────────
 async function notifyDealAgreed(matchId: string, agreedPrice: number) {
   const listings = await getBothListings(matchId)
   if (!listings) return
@@ -77,7 +72,6 @@ async function notifyDealAgreed(matchId: string, agreedPrice: number) {
   await sendEmail(buyerListing.user_email, `Deal confirmed — ${model}`, emailHtml(buyerListing.id))
 }
 
-// ── Notify partner paid ───────────────────────────────────────────────────────
 async function notifyPartnerPaid(matchId: string, paidRole: 'buyer' | 'seller') {
   const listings = await getBothListings(matchId)
   if (!listings) return
@@ -106,7 +100,6 @@ async function notifyPartnerPaid(matchId: string, paidRole: 'buyer' | 'seller') 
     </div>`)
 }
 
-// ── Notify match cancelled ────────────────────────────────────────────────────
 async function notifyMatchCancelled(matchId: string) {
   const listings = await getBothListings(matchId)
   if (!listings) return
@@ -137,10 +130,10 @@ async function notifyMatchCancelled(matchId: string) {
   await sendEmail(buyerListing.user_email, `Match cancelled — ${model}`, emailHtml(buyerListing.id))
 }
 
-// ── Check and cancel expired matches ─────────────────────────────────────────
 async function cancelExpiredMatch(matchId: string) {
   const { data: match } = await supabase
-    .from('matches').select('*, listingA:listings!listing_a(user_email), listingB:listings!listing_b(user_email)')
+    .from('matches')
+    .select('*, listingA:listings!listing_a(user_email), listingB:listings!listing_b(user_email)')
     .eq('id', matchId).single()
 
   if (!match) return
@@ -149,7 +142,6 @@ async function cancelExpiredMatch(matchId: string) {
   if (new Date(match.payment_deadline) > new Date()) return
   if (match.buyer_paid && match.seller_paid) return
 
-  // Add to blocked pairs
   const emailA = (match.listingA as any)?.user_email
   const emailB = (match.listingB as any)?.user_email
   if (emailA && emailB) {
@@ -158,17 +150,13 @@ async function cancelExpiredMatch(matchId: string) {
     }])
   }
 
-  // Relist both listings
   await supabase.from('listings').update({ matched: false }).eq('id', match.listing_a)
   await supabase.from('listings').update({ matched: false }).eq('id', match.listing_b)
-
-  // Cancel the match
   await supabase.from('matches').update({ status: 'cancelled' }).eq('id', matchId)
 
   await notifyMatchCancelled(matchId)
 }
 
-// ── Main handler ──────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const { match_id, role, direction, action } = await req.json()
 
@@ -176,102 +164,113 @@ export async function POST(req: NextRequest) {
     .from('matches').select('*').eq('id', match_id).single()
   if (!match) return NextResponse.json({ error: 'Match not found' }, { status: 404 })
 
-  // ── Check payment deadline expiry ──────────────────────────────
+  // Check expiry
   if (match.status === 'agreed' && match.payment_deadline) {
     await cancelExpiredMatch(match_id)
-    const { data: refreshed } = await supabase.from('matches').select('*').eq('id', match_id).single()
+    const { data: refreshed } = await supabase.from('matches').select('status').eq('id', match_id).single()
     if (refreshed?.status === 'cancelled') {
-      return NextResponse.json({ error: 'Match has been cancelled due to payment timeout' }, { status: 410 })
+      return NextResponse.json({ error: 'Match cancelled due to payment timeout' }, { status: 410 })
     }
   }
 
-  // ── Notify payment ─────────────────────────────────────────────
+  // ── Notify payment ──────────────────────────────────────────────────────────
   if (action === 'notify_payment') {
     await notifyPartnerPaid(match_id, role as 'buyer' | 'seller')
     return NextResponse.json({ ok: true })
   }
 
-  // ── Lock offer ─────────────────────────────────────────────────
+  // ── Lock offer ──────────────────────────────────────────────────────────────
   if (action === 'lock') {
     const lockField = role === 'buyer' ? 'buyer_locked' : 'seller_locked'
-    await supabase.from('matches').update({ [lockField]: true }).eq('id', match_id)
+    // Save last locked price when locking
+    const lastField = role === 'buyer' ? 'last_buyer_offer' : 'last_seller_offer'
+    const currentOffer = role === 'buyer'
+      ? (match.buyer_offer ?? match.anchor_price)
+      : (match.seller_offer ?? match.anchor_price)
+
+    await supabase.from('matches').update({
+      [lockField]: true,
+      [lastField]: currentOffer,
+      // reset own confirmed flag when re-locking
+      [role === 'buyer' ? 'buyer_confirmed' : 'seller_confirmed']: false,
+    }).eq('id', match_id)
 
     const buyerLocked = role === 'buyer' ? true : match.buyer_locked
     const sellerLocked = role === 'seller' ? true : match.seller_locked
-    const buyerOffer = match.buyer_offer ?? match.anchor_price
-    const sellerOffer = match.seller_offer ?? match.anchor_price
     const count = match.renegotiation_count ?? 0
 
-    // Both locked — check if offers meet
     if (buyerLocked && sellerLocked) {
-      if (buyerOffer >= sellerOffer) {
-        const midpoint = Math.round((buyerOffer + sellerOffer) / 2 / 100) * 100
+      const buyerOffer = match.buyer_offer ?? match.anchor_price
+      const sellerOffer = match.seller_offer ?? match.anchor_price
+      const midpoint = Math.round((buyerOffer + sellerOffer) / 2 / 100) * 100
 
-        // On 3rd renegotiation, force confirm
-        if (count >= MAX_RENEGOTIATIONS) {
-          const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-          await supabase.from('matches').update({
-            agreed_price: midpoint,
-            negotiation_status: 'agreed',
-            status: 'agreed',
-            payment_deadline: deadline,
-          }).eq('id', match_id)
-          await notifyDealAgreed(match_id, midpoint)
-          return NextResponse.json({ both_locked: true, forced: true, agreed_price: midpoint })
-        }
-
-        // Otherwise ask if they want midpoint
-        return NextResponse.json({
-          both_locked: true,
-          forced: false,
-          midpoint,
-          buyer_offer: buyerOffer,
-          seller_offer: sellerOffer,
-          renegotiations_left: MAX_RENEGOTIATIONS - count,
-        })
+      // On 3rd renegotiation both sides are forced — auto-confirm
+      if (count >= MAX_RENEGOTIATIONS) {
+        const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        await supabase.from('matches').update({
+          agreed_price: midpoint,
+          negotiation_status: 'agreed',
+          status: 'agreed',
+          payment_deadline: deadline,
+          buyer_confirmed: true,
+          seller_confirmed: true,
+        }).eq('id', match_id)
+        await notifyDealAgreed(match_id, midpoint)
+        return NextResponse.json({ both_locked: true, forced: true, agreed_price: midpoint })
       }
 
-      // Both locked but prices don't meet — unlock both, keep negotiating
-      await supabase.from('matches').update({
-        buyer_locked: false, seller_locked: false,
-      }).eq('id', match_id)
       return NextResponse.json({
-        both_locked: false,
-        prices_dont_meet: true,
-        buyer_offer: buyerOffer,
-        seller_offer: sellerOffer,
+        both_locked: true,
+        forced: false,
+        midpoint,
+        renegotiations_left: MAX_RENEGOTIATIONS - count,
       })
     }
 
     return NextResponse.json({ locked: true, role })
   }
 
-  // ── Confirm midpoint ───────────────────────────────────────────
+  // ── Confirm midpoint — BOTH must confirm ────────────────────────────────────
   if (action === 'confirm_midpoint') {
-    const buyerOffer = match.buyer_offer ?? match.anchor_price
-    const sellerOffer = match.seller_offer ?? match.anchor_price
-    const midpoint = Math.round((buyerOffer + sellerOffer) / 2 / 100) * 100
-    const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const confirmField = role === 'buyer' ? 'buyer_confirmed' : 'seller_confirmed'
+    await supabase.from('matches').update({ [confirmField]: true }).eq('id', match_id)
 
-    await supabase.from('matches').update({
-      agreed_price: midpoint,
-      negotiation_status: 'agreed',
-      status: 'agreed',
-      payment_deadline: deadline,
-    }).eq('id', match_id)
+    const buyerConfirmed = role === 'buyer' ? true : match.buyer_confirmed
+    const sellerConfirmed = role === 'seller' ? true : match.seller_confirmed
 
-    await notifyDealAgreed(match_id, midpoint)
-    return NextResponse.json({ agreed: true, agreed_price: midpoint })
+    if (buyerConfirmed && sellerConfirmed) {
+      const buyerOffer = match.buyer_offer ?? match.anchor_price
+      const sellerOffer = match.seller_offer ?? match.anchor_price
+      const midpoint = Math.round((buyerOffer + sellerOffer) / 2 / 100) * 100
+      const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+
+      await supabase.from('matches').update({
+        agreed_price: midpoint,
+        negotiation_status: 'agreed',
+        status: 'agreed',
+        payment_deadline: deadline,
+        buyer_confirmed: false,
+        seller_confirmed: false,
+      }).eq('id', match_id)
+
+      await notifyDealAgreed(match_id, midpoint)
+      return NextResponse.json({ agreed: true, agreed_price: midpoint })
+    }
+
+    return NextResponse.json({ confirmed: true, waiting: true })
   }
 
-  // ── Renegotiate — unlock both sides ───────────────────────────
+  // ── Renegotiate — either side clicking this resets BOTH ─────────────────────
   if (action === 'renegotiate') {
     const count = match.renegotiation_count ?? 0
     if (count >= MAX_RENEGOTIATIONS) {
       return NextResponse.json({ error: 'Max renegotiations reached' }, { status: 400 })
     }
-    const anchor = match.anchor_price
-    const spread = Math.max(300, Math.round(anchor * 0.20))
+
+    // Reset to last locked prices, not random anchors
+    // If no last locked price stored, fall back to current offers
+    const resetBuyer = match.last_buyer_offer ?? match.buyer_offer ?? match.anchor_price
+    const resetSeller = match.last_seller_offer ?? match.seller_offer ?? match.anchor_price
 
     await supabase.from('matches').update({
       negotiation_status: 'pending',
@@ -279,8 +278,10 @@ export async function POST(req: NextRequest) {
       agreed_price: null,
       buyer_locked: false,
       seller_locked: false,
-      buyer_offer: anchor - spread,
-      seller_offer: anchor + spread,
+      buyer_confirmed: false,
+      seller_confirmed: false,
+      buyer_offer: resetBuyer,
+      seller_offer: resetSeller,
       renegotiation_count: count + 1,
     }).eq('id', match_id)
 
@@ -290,7 +291,7 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // ── Match price (snap to other side's offer) ───────────────────
+  // ── Match price (snap to other side's offer) ────────────────────────────────
   if (action === 'match_price') {
     const count = match.renegotiation_count ?? 0
     if (count < 1) {
@@ -303,14 +304,16 @@ export async function POST(req: NextRequest) {
 
     const myField = role === 'buyer' ? 'buyer_offer' : 'seller_offer'
     const myLockField = role === 'buyer' ? 'buyer_locked' : 'seller_locked'
+    const myLastField = role === 'buyer' ? 'last_buyer_offer' : 'last_seller_offer'
     const otherLockField = role === 'buyer' ? 'seller_locked' : 'buyer_locked'
 
     await supabase.from('matches').update({
       [myField]: otherOffer,
       [myLockField]: true,
+      [myLastField]: otherOffer,
+      [role === 'buyer' ? 'buyer_confirmed' : 'seller_confirmed']: false,
     }).eq('id', match_id)
 
-    // If other side is also locked → both locked at same price → auto confirm
     if (match[otherLockField]) {
       const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       await supabase.from('matches').update({
@@ -326,7 +329,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ matched_price: true, offer: otherOffer })
   }
 
-  // ── Regular move +/− ──────────────────────────────────────────
+  // ── Regular move +/− ────────────────────────────────────────────────────────
   if (match.negotiation_status === 'agreed') {
     return NextResponse.json({ error: 'Already agreed' }, { status: 400 })
   }
@@ -341,10 +344,10 @@ export async function POST(req: NextRequest) {
     ? Math.min(current + 100, match.ladder_max)
     : Math.max(current - 100, match.ladder_min)
 
-  // Moving unlocks your side
   await supabase.from('matches').update({
     [field]: newOffer,
     [lockField]: false,
+    [role === 'buyer' ? 'buyer_confirmed' : 'seller_confirmed']: false,
   }).eq('id', match_id)
 
   return NextResponse.json({
