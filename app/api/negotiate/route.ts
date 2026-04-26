@@ -9,30 +9,23 @@ const supabase = createClient(
 const MAX_RENEGOTIATIONS = 3
 const APPURL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://budmatch.vercel.app'
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 async function sendEmail(to: string, subject: string, html: string) {
   try {
-    await supabase.functions.invoke('send-email', {
-      body: { to, subject, html },
-    })
+    await supabase.functions.invoke('send-email', { body: { to, subject, html } })
   } catch (e) {
     console.error('Email error:', e)
   }
 }
 
 async function createNotification(
-  userEmail: string,
-  type: string,
-  message: string,
-  listingId: string,
-  matchId: string
+  userEmail: string, type: string, message: string,
+  listingId: string, matchId: string
 ) {
   await supabase.from('notifications').insert([{
-    user_email: userEmail,
-    type,
-    message,
-    listing_id: listingId,
-    match_id: matchId,
-    read: false,
+    user_email: userEmail, type, message,
+    listing_id: listingId, match_id: matchId, read: false,
   }])
 }
 
@@ -40,37 +33,35 @@ async function getBothListings(matchId: string) {
   const { data: match } = await supabase
     .from('matches').select('listing_a, listing_b').eq('id', matchId).single()
   if (!match) return null
-
-  const { data: sellerListing } = await supabase
-    .from('listings').select('id, user_email, model').eq('id', match.listing_a).single()
-  const { data: buyerListing } = await supabase
-    .from('listings').select('id, user_email, model').eq('id', match.listing_b).single()
-
-  if (!sellerListing || !buyerListing) return null
-  return { sellerListing, buyerListing }
+  const { data: sl } = await supabase.from('listings')
+    .select('id, user_email, model').eq('id', match.listing_a).single()
+  const { data: bl } = await supabase.from('listings')
+    .select('id, user_email, model').eq('id', match.listing_b).single()
+  if (!sl || !bl) return null
+  return { sellerListing: sl, buyerListing: bl }
 }
 
+// ── Notify deal confirmed → pay ───────────────────────────────────────────────
 async function notifyDealAgreed(matchId: string, agreedPrice: number) {
   const listings = await getBothListings(matchId)
   if (!listings) return
   const { sellerListing, buyerListing } = listings
-
   const model = sellerListing.model
   const fee = Math.max(100, Math.round(agreedPrice * 0.10))
-  const message = `Deal agreed at LKR ${agreedPrice.toLocaleString()} for ${model}. Pay LKR ${fee.toLocaleString()} to unlock chat.`
+  const msg = `Deal confirmed at LKR ${agreedPrice.toLocaleString()} for ${model}. Pay LKR ${fee.toLocaleString()} within 24 hours to unlock chat.`
 
-  await createNotification(sellerListing.user_email, 'deal_agreed', message, sellerListing.id, matchId)
-  await createNotification(buyerListing.user_email, 'deal_agreed', message, buyerListing.id, matchId)
+  await createNotification(sellerListing.user_email, 'deal_agreed', msg, sellerListing.id, matchId)
+  await createNotification(buyerListing.user_email, 'deal_agreed', msg, buyerListing.id, matchId)
 
   const emailHtml = (listingId: string) => `
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f5f5f0">
       <div style="background:#fff;border-radius:20px;padding:32px;border:1px solid #e8e8e8">
-        <h2 style="color:#111;font-size:22px;margin:0 0 8px;font-weight:600">Deal agreed! 🤝</h2>
+        <h2 style="color:#111;font-size:22px;margin:0 0 8px;font-weight:600">Deal confirmed! 🤝</h2>
         <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 16px">
           You and your match agreed on <strong>LKR ${agreedPrice.toLocaleString()}</strong> for the <strong>${model}</strong>.
         </p>
         <div style="background:#f5f5f0;border-radius:12px;padding:16px;margin-bottom:24px">
-          <p style="color:#888;font-size:12px;margin:0 0 4px">Your platform fee (5%)</p>
+          <p style="color:#888;font-size:12px;margin:0 0 4px">Your platform fee (10%)</p>
           <p style="color:#111;font-size:20px;font-weight:600;margin:0">LKR ${fee.toLocaleString()}</p>
           <p style="color:#e57373;font-size:11px;margin:6px 0 0">⚠️ Pay within 24 hours or the match will be cancelled.</p>
         </div>
@@ -80,80 +71,214 @@ async function notifyDealAgreed(matchId: string, agreedPrice: number) {
         </a>
         <p style="color:#bbb;font-size:11px;margin-top:28px">BudMatch · Sri Lanka</p>
       </div>
-    </div>
-  `
+    </div>`
 
-  await sendEmail(sellerListing.user_email, `Deal agreed — ${model}`, emailHtml(sellerListing.id))
-  await sendEmail(buyerListing.user_email, `Deal agreed — ${model}`, emailHtml(buyerListing.id))
+  await sendEmail(sellerListing.user_email, `Deal confirmed — ${model}`, emailHtml(sellerListing.id))
+  await sendEmail(buyerListing.user_email, `Deal confirmed — ${model}`, emailHtml(buyerListing.id))
 }
 
+// ── Notify partner paid ───────────────────────────────────────────────────────
 async function notifyPartnerPaid(matchId: string, paidRole: 'buyer' | 'seller') {
   const listings = await getBothListings(matchId)
   if (!listings) return
   const { sellerListing, buyerListing } = listings
-
-  // Notify the OTHER party
   const notifyEmail = paidRole === 'buyer' ? sellerListing.user_email : buyerListing.user_email
   const notifyListingId = paidRole === 'buyer' ? sellerListing.id : buyerListing.id
   const paidLabel = paidRole === 'buyer' ? 'The buyer' : 'The seller'
   const model = sellerListing.model
+  const msg = `${paidLabel} has paid their fee for ${model}. You have 24 hours to pay or the deal is cancelled.`
 
-  const message = `${paidLabel} has paid their fee for ${model}. You have 24 hours to pay yours or the match will be cancelled.`
-
-  await createNotification(notifyEmail, 'partner_paid', message, notifyListingId, matchId)
-
-  const emailHtml = `
+  await createNotification(notifyEmail, 'partner_paid', msg, notifyListingId, matchId)
+  await sendEmail(notifyEmail, `Action needed — ${model}`, `
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f5f5f0">
       <div style="background:#fff;border-radius:20px;padding:32px;border:1px solid #e8e8e8">
-        <h2 style="color:#111;font-size:22px;margin:0 0 8px;font-weight:600">${paidLabel} paid ✓</h2>
-        <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 16px">
-          Your match paid their platform fee for the <strong>${model}</strong>.
-          Pay yours within <strong>24 hours</strong> to unlock chat — otherwise the deal is cancelled.
+        <h2 style="color:#111;font-size:22px;margin:0 0 8px">${paidLabel} paid ✓</h2>
+        <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 24px">
+          Your match paid their fee for <strong>${model}</strong>.
+          Pay yours within <strong>24 hours</strong> or the deal is cancelled.
         </p>
         <a href="${APPURL}/listings/${notifyListingId}"
-           style="display:inline-block;background:#111;color:#fff;padding:12px 28px;border-radius:999px;text-decoration:none;font-size:13px;font-weight:500">
+           style="display:inline-block;background:#111;color:#fff;padding:12px 28px;border-radius:999px;text-decoration:none;font-size:13px">
           Pay now →
         </a>
         <p style="color:#bbb;font-size:11px;margin-top:28px">BudMatch · Sri Lanka</p>
       </div>
-    </div>
-  `
-
-  await sendEmail(notifyEmail, `Action needed — ${model}`, emailHtml)
+    </div>`)
 }
 
+// ── Notify match cancelled ────────────────────────────────────────────────────
+async function notifyMatchCancelled(matchId: string) {
+  const listings = await getBothListings(matchId)
+  if (!listings) return
+  const { sellerListing, buyerListing } = listings
+  const model = sellerListing.model
+  const msg = `Your match for ${model} was cancelled due to payment timeout. You've been put back in the pool.`
+
+  await createNotification(sellerListing.user_email, 'match_cancelled', msg, sellerListing.id, matchId)
+  await createNotification(buyerListing.user_email, 'match_cancelled', msg, buyerListing.id, matchId)
+
+  const emailHtml = (listingId: string) => `
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f5f5f0">
+      <div style="background:#fff;border-radius:20px;padding:32px;border:1px solid #e8e8e8">
+        <h2 style="color:#111;font-size:22px;margin:0 0 8px">Match cancelled ❌</h2>
+        <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 24px">
+          Your match for the <strong>${model}</strong> was cancelled because the payment window expired.
+          You've been put back in the matching pool automatically.
+        </p>
+        <a href="${APPURL}/browse"
+           style="display:inline-block;background:#111;color:#fff;padding:12px 28px;border-radius:999px;text-decoration:none;font-size:13px">
+          Browse listings →
+        </a>
+        <p style="color:#bbb;font-size:11px;margin-top:28px">BudMatch · Sri Lanka</p>
+      </div>
+    </div>`
+
+  await sendEmail(sellerListing.user_email, `Match cancelled — ${model}`, emailHtml(sellerListing.id))
+  await sendEmail(buyerListing.user_email, `Match cancelled — ${model}`, emailHtml(buyerListing.id))
+}
+
+// ── Check and cancel expired matches ─────────────────────────────────────────
+async function cancelExpiredMatch(matchId: string) {
+  const { data: match } = await supabase
+    .from('matches').select('*, listingA:listings!listing_a(user_email), listingB:listings!listing_b(user_email)')
+    .eq('id', matchId).single()
+
+  if (!match) return
+  if (match.status !== 'agreed') return
+  if (!match.payment_deadline) return
+  if (new Date(match.payment_deadline) > new Date()) return
+  if (match.buyer_paid && match.seller_paid) return
+
+  // Add to blocked pairs
+  const emailA = (match.listingA as any)?.user_email
+  const emailB = (match.listingB as any)?.user_email
+  if (emailA && emailB) {
+    await supabase.from('blocked_pairs').insert([{
+      email_a: emailA, email_b: emailB, reason: 'payment_timeout',
+    }])
+  }
+
+  // Relist both listings
+  await supabase.from('listings').update({ matched: false }).eq('id', match.listing_a)
+  await supabase.from('listings').update({ matched: false }).eq('id', match.listing_b)
+
+  // Cancel the match
+  await supabase.from('matches').update({ status: 'cancelled' }).eq('id', matchId)
+
+  await notifyMatchCancelled(matchId)
+}
+
+// ── Main handler ──────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const { match_id, role, direction, action } = await req.json()
-  // action = 'negotiate' (default) | 'renegotiate' | 'notify_payment'
 
   const { data: match } = await supabase
     .from('matches').select('*').eq('id', match_id).single()
-
   if (!match) return NextResponse.json({ error: 'Match not found' }, { status: 404 })
 
-  // ── Notify payment (called from the ID page when one side pays) ──
+  // ── Check payment deadline expiry ──────────────────────────────
+  if (match.status === 'agreed' && match.payment_deadline) {
+    await cancelExpiredMatch(match_id)
+    const { data: refreshed } = await supabase.from('matches').select('*').eq('id', match_id).single()
+    if (refreshed?.status === 'cancelled') {
+      return NextResponse.json({ error: 'Match has been cancelled due to payment timeout' }, { status: 410 })
+    }
+  }
+
+  // ── Notify payment ─────────────────────────────────────────────
   if (action === 'notify_payment') {
     await notifyPartnerPaid(match_id, role as 'buyer' | 'seller')
     return NextResponse.json({ ok: true })
   }
 
-  // ── Renegotiate — unlock the bar (max 3 times) ───────────────────
-  if (action === 'renegotiate') {
-    if (match.negotiation_status !== 'agreed') {
-      return NextResponse.json({ error: 'Not in agreed state' }, { status: 400 })
+  // ── Lock offer ─────────────────────────────────────────────────
+  if (action === 'lock') {
+    const lockField = role === 'buyer' ? 'buyer_locked' : 'seller_locked'
+    await supabase.from('matches').update({ [lockField]: true }).eq('id', match_id)
+
+    const buyerLocked = role === 'buyer' ? true : match.buyer_locked
+    const sellerLocked = role === 'seller' ? true : match.seller_locked
+    const buyerOffer = match.buyer_offer ?? match.anchor_price
+    const sellerOffer = match.seller_offer ?? match.anchor_price
+    const count = match.renegotiation_count ?? 0
+
+    // Both locked — check if offers meet
+    if (buyerLocked && sellerLocked) {
+      if (buyerOffer >= sellerOffer) {
+        const midpoint = Math.round((buyerOffer + sellerOffer) / 2 / 100) * 100
+
+        // On 3rd renegotiation, force confirm
+        if (count >= MAX_RENEGOTIATIONS) {
+          const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+          await supabase.from('matches').update({
+            agreed_price: midpoint,
+            negotiation_status: 'agreed',
+            status: 'agreed',
+            payment_deadline: deadline,
+          }).eq('id', match_id)
+          await notifyDealAgreed(match_id, midpoint)
+          return NextResponse.json({ both_locked: true, forced: true, agreed_price: midpoint })
+        }
+
+        // Otherwise ask if they want midpoint
+        return NextResponse.json({
+          both_locked: true,
+          forced: false,
+          midpoint,
+          buyer_offer: buyerOffer,
+          seller_offer: sellerOffer,
+          renegotiations_left: MAX_RENEGOTIATIONS - count,
+        })
+      }
+
+      // Both locked but prices don't meet — unlock both, keep negotiating
+      await supabase.from('matches').update({
+        buyer_locked: false, seller_locked: false,
+      }).eq('id', match_id)
+      return NextResponse.json({
+        both_locked: false,
+        prices_dont_meet: true,
+        buyer_offer: buyerOffer,
+        seller_offer: sellerOffer,
+      })
     }
+
+    return NextResponse.json({ locked: true, role })
+  }
+
+  // ── Confirm midpoint ───────────────────────────────────────────
+  if (action === 'confirm_midpoint') {
+    const buyerOffer = match.buyer_offer ?? match.anchor_price
+    const sellerOffer = match.seller_offer ?? match.anchor_price
+    const midpoint = Math.round((buyerOffer + sellerOffer) / 2 / 100) * 100
+    const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+
+    await supabase.from('matches').update({
+      agreed_price: midpoint,
+      negotiation_status: 'agreed',
+      status: 'agreed',
+      payment_deadline: deadline,
+    }).eq('id', match_id)
+
+    await notifyDealAgreed(match_id, midpoint)
+    return NextResponse.json({ agreed: true, agreed_price: midpoint })
+  }
+
+  // ── Renegotiate — unlock both sides ───────────────────────────
+  if (action === 'renegotiate') {
     const count = match.renegotiation_count ?? 0
     if (count >= MAX_RENEGOTIATIONS) {
       return NextResponse.json({ error: 'Max renegotiations reached' }, { status: 400 })
     }
-
-    // Reset to offset anchors so there's room to move
     const anchor = match.anchor_price
-    const spread = Math.max(300, Math.round(anchor * 0.10))
+    const spread = Math.max(300, Math.round(anchor * 0.20))
+
     await supabase.from('matches').update({
       negotiation_status: 'pending',
       status: 'pending',
       agreed_price: null,
+      buyer_locked: false,
+      seller_locked: false,
       buyer_offer: anchor - spread,
       seller_offer: anchor + spread,
       renegotiation_count: count + 1,
@@ -165,42 +290,66 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // ── Regular negotiate ────────────────────────────────────────────
-  if (match.negotiation_status === 'agreed') {
-    return NextResponse.json({ error: 'Already agreed — renegotiate first' }, { status: 400 })
-  }
+  // ── Match price (snap to other side's offer) ───────────────────
+  if (action === 'match_price') {
+    const count = match.renegotiation_count ?? 0
+    if (count < 1) {
+      return NextResponse.json({ error: 'Match price only available after first renegotiation' }, { status: 400 })
+    }
 
-  const step = 100
-  const field = role === 'buyer' ? 'buyer_offer' : 'seller_offer'
-  const defaultSpread = Math.max(300, Math.round(match.anchor_price * 0.10))
-  const current = match[field] ?? (role === 'buyer' ? match.anchor_price - defaultSpread : match.anchor_price + defaultSpread)
+    const otherOffer = role === 'buyer'
+      ? (match.seller_offer ?? match.anchor_price)
+      : (match.buyer_offer ?? match.anchor_price)
 
-  const newOffer = direction === 'up'
-    ? Math.min(current + step, match.ladder_max)
-    : Math.max(current - step, match.ladder_min)
-
-  await supabase.from('matches').update({ [field]: newOffer }).eq('id', match_id)
-
-  const buyerOffer = role === 'buyer' ? newOffer : (match.buyer_offer ?? match.anchor_price - defaultSpread)
-  const sellerOffer = role === 'seller' ? newOffer : (match.seller_offer ?? match.anchor_price + defaultSpread)
-
-  // Auto-agree when offers meet
-  if (buyerOffer >= sellerOffer) {
-    const agreedPrice = Math.round((buyerOffer + sellerOffer) / 2 / 100) * 100
-
-    // Set 24 hour payment deadline
-    const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const myField = role === 'buyer' ? 'buyer_offer' : 'seller_offer'
+    const myLockField = role === 'buyer' ? 'buyer_locked' : 'seller_locked'
+    const otherLockField = role === 'buyer' ? 'seller_locked' : 'buyer_locked'
 
     await supabase.from('matches').update({
-      agreed_price: agreedPrice,
-      negotiation_status: 'agreed',
-      status: 'agreed',
-      payment_deadline: deadline,
+      [myField]: otherOffer,
+      [myLockField]: true,
     }).eq('id', match_id)
 
-    await notifyDealAgreed(match_id, agreedPrice)
-    return NextResponse.json({ agreed: true, agreed_price: agreedPrice })
+    // If other side is also locked → both locked at same price → auto confirm
+    if (match[otherLockField]) {
+      const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      await supabase.from('matches').update({
+        agreed_price: otherOffer,
+        negotiation_status: 'agreed',
+        status: 'agreed',
+        payment_deadline: deadline,
+      }).eq('id', match_id)
+      await notifyDealAgreed(match_id, otherOffer)
+      return NextResponse.json({ agreed: true, agreed_price: otherOffer })
+    }
+
+    return NextResponse.json({ matched_price: true, offer: otherOffer })
   }
 
-  return NextResponse.json({ agreed: false, buyer_offer: buyerOffer, seller_offer: sellerOffer })
+  // ── Regular move +/− ──────────────────────────────────────────
+  if (match.negotiation_status === 'agreed') {
+    return NextResponse.json({ error: 'Already agreed' }, { status: 400 })
+  }
+
+  const field = role === 'buyer' ? 'buyer_offer' : 'seller_offer'
+  const lockField = role === 'buyer' ? 'buyer_locked' : 'seller_locked'
+  const anchor = match.anchor_price
+  const spread = Math.max(300, Math.round(anchor * 0.20))
+  const current = match[field] ?? (role === 'buyer' ? anchor - spread : anchor + spread)
+
+  const newOffer = direction === 'up'
+    ? Math.min(current + 100, match.ladder_max)
+    : Math.max(current - 100, match.ladder_min)
+
+  // Moving unlocks your side
+  await supabase.from('matches').update({
+    [field]: newOffer,
+    [lockField]: false,
+  }).eq('id', match_id)
+
+  return NextResponse.json({
+    agreed: false,
+    buyer_offer: role === 'buyer' ? newOffer : match.buyer_offer,
+    seller_offer: role === 'seller' ? newOffer : match.seller_offer,
+  })
 }
