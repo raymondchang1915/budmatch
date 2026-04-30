@@ -24,12 +24,30 @@ type Match = {
   created_at: string
 }
 
+type Offer = {
+  id: string
+  listing_id: string
+  sender_email: string
+  amount: number
+  status: string
+  created_at: string
+  match_id: string | null
+  listings: {
+    model: string
+    has_component: string
+    user_email: string
+  }
+}
+
 export default function Profile() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [listings, setListings] = useState<Listing[]>([])
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
+  const [incomingOffers, setIncomingOffers] = useState<Offer[]>([])
+  const [sentOffers, setSentOffers] = useState<Offer[]>([])
+  const [offerLoading, setOfferLoading] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -60,6 +78,62 @@ export default function Profile() {
         .order('created_at', { ascending: false })
       setMatches(matchData ?? [])
     }
+
+    loadOffers(email)
+  }
+
+  async function loadOffers(email: string) {
+    setOfferLoading(true)
+    const { data: myListings } = await supabase
+      .from('listings').select('id').eq('user_email', email)
+    const myListingIds = (myListings ?? []).map(l => l.id)
+
+    if (myListingIds.length > 0) {
+      const { data: incoming } = await supabase
+        .from('offers')
+        .select('*, listings(model, has_component, user_email)')
+        .in('listing_id', myListingIds)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+      setIncomingOffers(incoming ?? [])
+    }
+
+    const { data: sent } = await supabase
+      .from('offers')
+      .select('*, listings(model, has_component, user_email)')
+      .eq('sender_email', email)
+      .order('created_at', { ascending: false })
+    setSentOffers(sent ?? [])
+    setOfferLoading(false)
+  }
+
+  async function handleAcceptOffer(offerId: string, listingId: string) {
+    const { data: listing } = await supabase
+      .from('listings').select('matched').eq('id', listingId).single()
+    if (listing?.matched) {
+      alert('You have an active match on this listing. Cancel your current match first to accept this offer.')
+      return
+    }
+    const res = await fetch('/api/offers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'accept', offer_id: offerId }),
+    })
+    const data = await res.json()
+    if (data.ok) {
+      router.push(`/offer-match/${data.match_id}`)
+    } else {
+      alert(data.error ?? 'Something went wrong')
+    }
+  }
+
+  async function handleDeclineOffer(offerId: string) {
+    await fetch('/api/offers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'decline', offer_id: offerId }),
+    })
+    setIncomingOffers(prev => prev.filter(o => o.id !== offerId))
   }
 
   const deleteListing = async (id: string) => {
@@ -232,6 +306,88 @@ export default function Profile() {
                   <p className="text-xs text-gray-400 mt-1">
                     {listing.has_component} → {listing.needs_component}
                   </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Incoming offers */}
+        {incomingOffers.length > 0 && (
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              Offers on your listings
+              <span className="ml-2 text-sm bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-normal">
+                {incomingOffers.length} pending
+              </span>
+            </h2>
+            <div className="space-y-3">
+              {incomingOffers.map(offer => (
+                <div key={offer.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {(offer.listings as any)?.model} — {(offer.listings as any)?.has_component}
+                      </p>
+                      <p className="text-sm text-gray-400 mt-0.5">
+                        From {offer.sender_email.split('@')[0]} · {new Date(offer.created_at).toLocaleDateString()}
+                      </p>
+                      <p className="text-lg font-bold text-gray-900 mt-2">
+                        LKR {Number(offer.amount).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <button type="button"
+                        onClick={() => handleAcceptOffer(offer.id, offer.listing_id)}
+                        className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-black transition">
+                        Accept
+                      </button>
+                      <button type="button"
+                        onClick={() => handleDeclineOffer(offer.id)}
+                        className="border border-gray-200 text-gray-500 px-4 py-2 rounded-full text-sm hover:border-gray-400 transition">
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Sent offers */}
+        {sentOffers.length > 0 && (
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Offers you sent</h2>
+            <div className="space-y-3">
+              {sentOffers.map(offer => (
+                <div key={offer.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900">{(offer.listings as any)?.model}</p>
+                      <p className="text-sm text-gray-400 mt-0.5">
+                        LKR {Number(offer.amount).toLocaleString()} · {new Date(offer.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {offer.status === 'pending' && (
+                        <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full">
+                          Pending
+                        </span>
+                      )}
+                      {offer.status === 'accepted' && offer.match_id && (
+                        <a href={`/offer-match/${offer.match_id}`}
+                          className="text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full hover:border-green-400 transition">
+                          Accepted — Pay now →
+                        </a>
+                      )}
+                      {offer.status === 'declined' && (
+                        <span className="text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full">
+                          Declined
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

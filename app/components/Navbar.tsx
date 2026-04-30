@@ -109,7 +109,10 @@ export default function Navbar() {
     type === 'matched' ? '⚡' :
     type === 'deal_agreed' ? '🤝' :
     type === 'partner_paid' ? '💳' :
-    type === 'new_message' ? '💬' : '🔔'
+    type === 'new_message' ? '💬' :
+    type === 'new_offer' ? '💰' :
+    type === 'offer_accepted' ? '✅' :
+    type === 'offer_declined' ? '❌' : '🔔'
 
   return (
     <>

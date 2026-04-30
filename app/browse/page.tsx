@@ -25,16 +25,11 @@ export default function Browse() {
   const [loading, setLoading] = useState(true)
   const [offerModal, setOfferModal] = useState<Listing | null>(null)
   const [offerPrice, setOfferPrice] = useState('')
-  const [offerEmail, setOfferEmail] = useState('')
   const [offerSent, setOfferSent] = useState(false)
+  const [offerLoading, setOfferLoading] = useState(false)
 
   useEffect(() => { fetchListings() }, [])
   useEffect(() => { applyFilters() }, [listings, tab, search])
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user?.email) setOfferEmail(data.user.email)
-    })
-  }, [])
 
   const fetchListings = async () => {
     const { data } = await supabase
@@ -61,13 +56,32 @@ export default function Browse() {
     setFiltered(result)
   }
 
-  const sendDirectOffer = async () => {
-    if (!offerModal || !offerPrice || !offerEmail) return
-    await supabase.from('listings').update({
-      direct_offer_price: parseFloat(offerPrice),
-      direct_offer_email: offerEmail,
-    }).eq('id', offerModal.id)
-    setOfferSent(true)
+  async function handleSendOffer() {
+    if (!offerPrice || !offerModal) return
+    setOfferLoading(true)
+    const { data: userData } = await supabase.auth.getUser()
+    if (!userData.user) {
+      alert('Please sign in to make an offer')
+      setOfferLoading(false)
+      return
+    }
+    const res = await fetch('/api/offers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'send',
+        listing_id: offerModal.id,
+        sender_email: userData.user.email,
+        amount: offerPrice,
+      }),
+    })
+    const data = await res.json()
+    setOfferLoading(false)
+    if (data.ok) {
+      setOfferSent(true)
+    } else {
+      alert(data.error ?? 'Something went wrong')
+    }
   }
 
   const conditionDot: Record<string, string> = {
@@ -363,39 +377,21 @@ export default function Browse() {
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                  <div>
-                    <label style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 6, fontFamily: 'system-ui', letterSpacing: '0.05em' }}>
-                      YOUR OFFER (LKR)
-                    </label>
-                    <input type="number" placeholder="e.g. 5000" style={{
-                      width: '100%', border: '1px solid #e8e8e8',
-                      borderRadius: 999, padding: '11px 18px',
-                      fontSize: 13, outline: 'none',
-                      fontFamily: 'system-ui', boxSizing: 'border-box',
-                    }}
-                      value={offerPrice}
-                      onChange={e => setOfferPrice(e.target.value)}
-                      onFocus={e => (e.currentTarget.style.borderColor = '#999')}
-                      onBlur={e => (e.currentTarget.style.borderColor = '#e8e8e8')}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 6, fontFamily: 'system-ui', letterSpacing: '0.05em' }}>
-                      YOUR EMAIL
-                    </label>
-                    <input type="email" placeholder="you@email.com" style={{
-                      width: '100%', border: '1px solid #e8e8e8',
-                      borderRadius: 999, padding: '11px 18px',
-                      fontSize: 13, outline: 'none',
-                      fontFamily: 'system-ui', boxSizing: 'border-box',
-                    }}
-                      value={offerEmail}
-                      onChange={e => setOfferEmail(e.target.value)}
-                      onFocus={e => (e.currentTarget.style.borderColor = '#999')}
-                      onBlur={e => (e.currentTarget.style.borderColor = '#e8e8e8')}
-                    />
-                  </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 6, fontFamily: 'system-ui', letterSpacing: '0.05em' }}>
+                    YOUR OFFER (LKR)
+                  </label>
+                  <input type="number" placeholder="e.g. 5000" style={{
+                    width: '100%', border: '1px solid #e8e8e8',
+                    borderRadius: 999, padding: '11px 18px',
+                    fontSize: 13, outline: 'none',
+                    fontFamily: 'system-ui', boxSizing: 'border-box', color: '#111',
+                  }}
+                    value={offerPrice}
+                    onChange={e => setOfferPrice(e.target.value)}
+                    onFocus={e => (e.currentTarget.style.borderColor = '#999')}
+                    onBlur={e => (e.currentTarget.style.borderColor = '#e8e8e8')}
+                  />
                 </div>
 
                 {offerModal.matched && (
@@ -419,18 +415,18 @@ export default function Browse() {
                   }}>
                     Cancel
                   </button>
-                  <button type="button" onClick={sendDirectOffer}
-                    disabled={!offerPrice || !offerEmail}
+                  <button type="button" onClick={handleSendOffer}
+                    disabled={!offerPrice || offerLoading}
                     style={{
-                      flex: 1, background: !offerPrice || !offerEmail ? '#e0e0e0' : '#111',
-                      color: !offerPrice || !offerEmail ? '#aaa' : '#fff',
+                      flex: 1, background: !offerPrice || offerLoading ? '#e0e0e0' : '#111',
+                      color: !offerPrice || offerLoading ? '#aaa' : '#fff',
                       padding: '11px 0', borderRadius: 999,
                       border: 'none', fontSize: 13,
-                      cursor: !offerPrice || !offerEmail ? 'not-allowed' : 'pointer',
+                      cursor: !offerPrice || offerLoading ? 'not-allowed' : 'pointer',
                       fontFamily: 'system-ui', fontWeight: 500,
                       transition: 'background 0.15s',
                     }}>
-                    Send offer
+                    {offerLoading ? 'Sending...' : 'Send offer'}
                   </button>
                 </div>
               </>
