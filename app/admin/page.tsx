@@ -61,7 +61,7 @@ type Shop = {
   email: string
   location: string
   shop_code: string
-  is_active: boolean
+  active: boolean
   is_dropoff: boolean
   total_earned: number
   created_at: string
@@ -122,7 +122,7 @@ export default function AdminPanel() {
       supabase.from('matches').select('*', { count: 'exact', head: true }).eq('status', 'agreed'),
       supabase.from('matches').select('*', { count: 'exact', head: true }).eq('status', 'paid'),
       supabase.from('matches').select('*', { count: 'exact', head: true }).eq('status', 'cancelled'),
-      supabase.from('shop_partners').select('*', { count: 'exact', head: true }).eq('is_active', false),
+      supabase.from('shop_partners').select('*', { count: 'exact', head: true }).eq('active', false),
       supabase.from('matches').select('agreed_price').eq('status', 'paid'),
     ])
 
@@ -168,8 +168,8 @@ export default function AdminPanel() {
   }
 
   async function activateShop(id: string, active: boolean) {
-    await supabase.from('shop_partners').update({ is_active: active }).eq('id', id)
-    setShops(prev => prev.map(s => s.id === id ? { ...s, is_active: active } : s))
+    await supabase.from('shop_partners').update({ active: active }).eq('id', id)
+    setShops(prev => prev.map(s => s.id === id ? { ...s, active: active } : s))
   }
 
   async function cancelMatch(id: string) {
@@ -442,7 +442,7 @@ export default function AdminPanel() {
             )}
             {shops.map(shop => (
               <div key={shop.id} className={`bg-white border rounded-2xl p-6 shadow-sm ${
-                !shop.is_active ? 'border-amber-200' : 'border-gray-200'
+                !shop.active ? 'border-amber-200' : 'border-gray-200'
               }`}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -451,7 +451,7 @@ export default function AdminPanel() {
                       <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
                         {shop.shop_code}
                       </span>
-                      {!shop.is_active && (
+                      {!shop.active && (
                         <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
                           Pending verification
                         </span>
@@ -494,7 +494,7 @@ export default function AdminPanel() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    {!shop.is_active ? (
+                    {!shop.active ? (
                       <button type="button" onClick={() => activateShop(shop.id, true)}
                         className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-black transition whitespace-nowrap">
                         Activate shop
