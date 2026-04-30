@@ -237,7 +237,17 @@ export default function Navbar() {
                           notifications.map(n => (
                             <Link
                               key={n.id}
-                              href={n.listing_id ? `/listings/${n.listing_id}` : '#'}
+                              href={
+                                n.type === 'new_offer'
+                                  ? '/profile'
+                                  : n.type === 'offer_accepted' && n.match_id
+                                    ? `/offer-match/${n.match_id}`
+                                    : n.type === 'offer_declined'
+                                      ? '/profile'
+                                      : n.listing_id
+                                        ? `/listings/${n.listing_id}`
+                                        : '#'
+                              }
                               onClick={() => { markRead(n.id); setNotifOpen(false) }}
                               style={{
                                 display: 'flex', gap: 12, padding: '12px 16px',
@@ -429,7 +439,17 @@ export default function Navbar() {
                 </div>
               ) : (
                 notifications.map(n => (
-                  <Link key={n.id} href={n.listing_id ? `/listings/${n.listing_id}` : '#'}
+                  <Link key={n.id} href={
+                                n.type === 'new_offer'
+                                  ? '/profile'
+                                  : n.type === 'offer_accepted' && n.match_id
+                                    ? `/offer-match/${n.match_id}`
+                                    : n.type === 'offer_declined'
+                                      ? '/profile'
+                                      : n.listing_id
+                                        ? `/listings/${n.listing_id}`
+                                        : '#'
+                              }
                     onClick={() => { markRead(n.id); setNotifOpen(false) }}
                     style={{
                       display: 'flex', gap: 12, padding: '12px 16px',
