@@ -5,6 +5,10 @@ import Navbar from './components/Navbar'
 export const metadata: Metadata = {
   title: 'BudMatch — Match your missing earbud',
   description: 'Find someone who has what you need and needs what you have.',
+  icons: {
+    icon: '/icon.svg',
+    apple: '/icon.svg',
+  },
 }
 
 export const viewport: Viewport = {
