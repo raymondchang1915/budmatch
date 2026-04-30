@@ -464,7 +464,7 @@ export default function ListingDetail() {
             </div>
           </div>
           <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
-            <span>{listing.user_email}</span>
+            <span>{listing.user_email.split('@')[0]}</span>
             <span>{new Date(listing.created_at).toLocaleDateString()}</span>
           </div>
         </div>

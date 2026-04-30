@@ -427,6 +427,14 @@ export default function Home() {
 
       </section>
 
+      <footer className="text-center py-8 text-xs text-gray-400 space-x-4">
+        <a href="/privacy" className="hover:text-gray-700 transition">Privacy Policy</a>
+        <span>·</span>
+        <a href="/terms" className="hover:text-gray-700 transition">Terms &amp; Conditions</a>
+        <span>·</span>
+        <a href="/refund" className="hover:text-gray-700 transition">Refund Policy</a>
+      </footer>
+
     </main>
   )
 }
