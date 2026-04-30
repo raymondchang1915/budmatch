@@ -178,7 +178,10 @@ export default function Navbar() {
                     onMouseEnter={e => (e.currentTarget.style.background = '#f0f0f0')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                   >
-                    🔔
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={unreadCount > 0 ? '#111' : '#888'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
                     {unreadCount > 0 && (
                       <span style={{
                         position: 'absolute', top: 2, right: 2,
@@ -332,10 +335,13 @@ export default function Navbar() {
                 style={{
                   position: 'relative', background: 'none',
                   border: 'none', cursor: 'pointer',
-                  padding: '4px 6px', fontSize: 16,
+                  padding: '4px 6px', display: 'flex', alignItems: 'center',
                 }}
               >
-                🔔
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={unreadCount > 0 ? '#111' : '#888'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
                 {unreadCount > 0 && (
                   <span style={{
                     position: 'absolute', top: 0, right: 0,

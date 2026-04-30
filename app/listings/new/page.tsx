@@ -225,7 +225,7 @@ export default function NewListing() {
   }
 
   const inputClass = "w-full bg-white border border-gray-200 rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 shadow-sm"
-  const selectClass = "w-full bg-white border border-gray-200 rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 shadow-sm appearance-none"
+  const selectClass = "w-full bg-white border border-gray-200 rounded-full px-5 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 shadow-sm appearance-none"
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5 ml-1"
 
   const currentYear = new Date().getFullYear()
