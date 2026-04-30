@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-export default function ConfirmPage() {
+function ConfirmInner() {
   const router = useRouter()
   const params = useSearchParams()
 
@@ -20,12 +20,28 @@ export default function ConfirmPage() {
           router.push('/?confirmed=true')
         }
       })
+    } else {
+      router.push('/auth')
     }
   }, [])
 
   return (
     <main className="min-h-screen bg-[#f5f5f0] flex items-center justify-center">
-      <p className="text-gray-400 text-sm animate-pulse">Confirming your account...</p>
+      <div className="text-center">
+        <p className="text-gray-400 text-sm animate-pulse">Confirming your account...</p>
+      </div>
     </main>
+  )
+}
+
+export default function ConfirmPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-[#f5f5f0] flex items-center justify-center">
+        <p className="text-gray-400 text-sm animate-pulse">Loading...</p>
+      </main>
+    }>
+      <ConfirmInner />
+    </Suspense>
   )
 }
