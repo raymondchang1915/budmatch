@@ -54,6 +54,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'You already have a pending offer on this listing' }, { status: 400 })
     }
 
+    // Check if sender already has an active match for the same model
+    const { data: senderListings } = await supabase
+      .from('listings')
+      .select('id, matched')
+      .eq('user_email', sender_email)
+      .eq('model', listing.model)
+      .eq('matched', true)
+
+    if (senderListings && senderListings.length > 0) {
+      return NextResponse.json({
+        error: 'You already have an active match for this model. Complete or cancel it before making an offer.'
+      }, { status: 400 })
+    }
+
     const { data: offer } = await supabase.from('offers').insert([{
       listing_id,
       sender_email,

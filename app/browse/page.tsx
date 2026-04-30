@@ -65,6 +65,21 @@ export default function Browse() {
       setOfferLoading(false)
       return
     }
+
+    // Check if user has an active match for same model
+    const { data: activeMatches } = await supabase
+      .from('listings')
+      .select('id')
+      .eq('user_email', userData.user.email)
+      .eq('model', offerModal.model)
+      .eq('matched', true)
+
+    if (activeMatches && activeMatches.length > 0) {
+      alert('You already have an active match for this model. Complete or cancel it before making an offer.')
+      setOfferLoading(false)
+      return
+    }
+
     const res = await fetch('/api/offers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
