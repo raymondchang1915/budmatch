@@ -20,9 +20,8 @@ type Stats = {
 }
 
 type User = {
-  id: string
   email: string
-  created_at: string
+  listing_count: number
   is_admin: boolean
 }
 
@@ -103,7 +102,7 @@ export default function AdminPanel() {
 
   async function loadStats() {
     const [
-      { count: totalUsers },
+      { data: userEmailData },
       { count: totalListings },
       { count: activeListings },
       { count: totalMatches },
@@ -114,7 +113,7 @@ export default function AdminPanel() {
       { count: pendingShops },
       { data: paidMatchData },
     ] = await Promise.all([
-      supabase.from('user_profiles').select('*', { count: 'exact', head: true }),
+      supabase.from('listings').select('user_email'),
       supabase.from('listings').select('*', { count: 'exact', head: true }),
       supabase.from('listings').select('*', { count: 'exact', head: true }).eq('matched', false),
       supabase.from('matches').select('*', { count: 'exact', head: true }),
@@ -126,12 +125,15 @@ export default function AdminPanel() {
       supabase.from('matches').select('agreed_price').eq('status', 'paid'),
     ])
 
+    const totalUsers = new Set((userEmailData ?? []).map(l => l.user_email)).size
+
+    // Both sides pay 5% each = 10% total per deal
     const totalRevenue = (paidMatchData ?? []).reduce((sum, m) => {
-      return sum + Math.max(100, Math.round((m.agreed_price ?? 0) * 0.05))
+      return sum + Math.max(200, Math.round((m.agreed_price ?? 0) * 0.10))
     }, 0)
 
     setStats({
-      totalUsers: totalUsers ?? 0,
+      totalUsers,
       totalListings: totalListings ?? 0,
       activeListings: activeListings ?? 0,
       totalMatches: totalMatches ?? 0,
@@ -149,8 +151,20 @@ export default function AdminPanel() {
     setLoading(true)
     setSearchQuery('')
     if (t === 'users') {
-      const { data } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false }).limit(100)
-      setUsers(data ?? [])
+      const [{ data: listingData }, { data: adminData }] = await Promise.all([
+        supabase.from('listings').select('user_email'),
+        supabase.from('user_profiles').select('email, is_admin'),
+      ])
+      const adminSet = new Set((adminData ?? []).filter(a => a.is_admin).map(a => a.email))
+      const counts: Record<string, number> = {}
+      for (const l of (listingData ?? [])) {
+        counts[l.user_email] = (counts[l.user_email] ?? 0) + 1
+      }
+      setUsers(
+        Object.entries(counts)
+          .map(([email, listing_count]) => ({ email, listing_count, is_admin: adminSet.has(email) }))
+          .sort((a, b) => b.listing_count - a.listing_count)
+      )
     } else if (t === 'listings') {
       const { data } = await supabase.from('listings').select('*').order('created_at', { ascending: false }).limit(100)
       setListings(data ?? [])
@@ -283,17 +297,17 @@ export default function AdminPanel() {
                 <thead>
                   <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
                     <th className="px-6 py-3 text-left">Email</th>
-                    <th className="px-6 py-3 text-left">Joined</th>
-                    <th className="px-6 py-3 text-left">Admin</th>
+                    <th className="px-6 py-3 text-left">Listings</th>
+                    <th className="px-6 py-3 text-left">Role</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users
                     .filter(u => u.email?.toLowerCase().includes(searchQuery.toLowerCase()))
                     .map(u => (
-                      <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50 transition">
+                      <tr key={u.email} className="border-b border-gray-50 hover:bg-gray-50 transition">
                         <td className="px-6 py-3 text-gray-900">{u.email}</td>
-                        <td className="px-6 py-3 text-gray-400">{new Date(u.created_at).toLocaleDateString()}</td>
+                        <td className="px-6 py-3 text-gray-500">{u.listing_count}</td>
                         <td className="px-6 py-3">
                           {u.is_admin
                             ? <span className="text-xs bg-gray-900 text-white px-2 py-0.5 rounded-full">Admin</span>
@@ -539,7 +553,7 @@ export default function AdminPanel() {
                       <td className="px-6 py-3 text-gray-400 font-mono text-xs">{m.id.slice(0, 8)}...</td>
                       <td className="px-6 py-3 text-gray-900">LKR {m.agreed_price?.toLocaleString()}</td>
                       <td className="px-6 py-3 text-green-600 font-medium">
-                        LKR {Math.max(100, Math.round((m.agreed_price ?? 0) * 0.05)).toLocaleString()}
+                        LKR {Math.max(200, Math.round((m.agreed_price ?? 0) * 0.10)).toLocaleString()}
                       </td>
                       <td className="px-6 py-3 text-gray-400">{new Date(m.created_at).toLocaleDateString()}</td>
                     </tr>
