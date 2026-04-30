@@ -88,7 +88,7 @@ export default function ListingDetail() {
   const theyConfirmed = match ? (myRole === 'buyer' ? match.seller_confirmed : match.buyer_confirmed) : false
 
   const agreedPrice = match?.agreed_price ?? match?.anchor_price ?? 0
-  const myFee = Math.max(100, Math.round(agreedPrice * 0.10))
+  const myFee = Math.max(100, Math.round(agreedPrice * 0.05))
 
   const renegsLeft = MAX_RENEGOTIATIONS - (match?.renegotiation_count ?? 0)
   const canMatchPrice = (match?.renegotiation_count ?? 0) >= 1 && match?.negotiation_status !== 'agreed'

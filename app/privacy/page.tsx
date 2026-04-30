@@ -56,7 +56,7 @@ export default function PrivacyPolicy() {
 
           <section>
             <h2 className="text-base font-semibold text-gray-900 mb-3">6. Your rights</h2>
-            <p>You may request access to, correction of, or deletion of your personal data at any time by emailing us at <strong>support@budmatch.site</strong>. We will respond within 14 days.</p>
+            <p>You may request access to, correction of, or deletion of your personal data at any time by emailing us at <strong>hello@budmatch.site</strong>. We will respond within 14 days.</p>
           </section>
 
           <section>
@@ -66,7 +66,7 @@ export default function PrivacyPolicy() {
 
           <section>
             <h2 className="text-base font-semibold text-gray-900 mb-3">8. Contact</h2>
-            <p>Questions about this policy? Email us at <strong>support@budmatch.site</strong>.</p>
+            <p>Questions about this policy? Email us at <strong>hello@budmatch.site</strong>.</p>
           </section>
 
         </div>

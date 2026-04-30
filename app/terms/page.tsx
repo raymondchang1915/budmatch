@@ -37,7 +37,7 @@ export default function TermsAndConditions() {
 
           <section>
             <h2 className="text-base font-semibold text-gray-900 mb-3">5. Platform fee</h2>
-            <p>Both the buyer and seller each pay a platform fee of <strong>10% of the agreed price</strong> (minimum LKR 100). This fee is paid to BudMatch via PayHere to unlock chat and confirm the deal. The fee is non-refundable except as stated in our Refund Policy.</p>
+            <p>Both the buyer and seller each pay a platform fee of <strong>5% of the agreed price</strong> (minimum LKR 100). This fee is paid to BudMatch via PayHere to unlock chat and confirm the deal. The fee is non-refundable except as stated in our Refund Policy.</p>
           </section>
 
           <section>
@@ -79,7 +79,7 @@ export default function TermsAndConditions() {
 
           <section>
             <h2 className="text-base font-semibold text-gray-900 mb-3">12. Contact</h2>
-            <p>Questions? Email us at <strong>support@budmatch.site</strong>.</p>
+            <p>Questions? Email us at <strong>hello@budmatch.site</strong>.</p>
           </section>
 
         </div>

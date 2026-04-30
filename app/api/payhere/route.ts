@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   }
 
   const agreedPrice = match.agreed_price ?? match.anchor_price
-  const feeAmount = Math.max(100, Math.round(agreedPrice * 0.10))
+  const feeAmount = Math.max(100, Math.round(agreedPrice * 0.05))
   const amount = feeAmount.toFixed(2)
   const currency = 'LKR'
   const orderId = `${match_id}-${role}`

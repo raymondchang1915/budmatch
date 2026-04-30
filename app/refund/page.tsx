@@ -11,7 +11,7 @@ export default function RefundPolicy() {
 
           <section>
             <h2 className="text-base font-semibold text-gray-900 mb-3">1. Overview</h2>
-            <p>BudMatch charges a platform fee of <strong>10% of the agreed price</strong> (minimum LKR 100) from each party — buyer and seller — to confirm a deal and unlock chat. This policy explains when that fee is refunded and when it is not.</p>
+            <p>BudMatch charges a platform fee of <strong>5% of the agreed price</strong> (minimum LKR 100) from each party — buyer and seller — to confirm a deal and unlock chat. This policy explains when that fee is refunded and when it is not.</p>
           </section>
 
           <section>
@@ -48,7 +48,7 @@ export default function RefundPolicy() {
 
           <section>
             <h2 className="text-base font-semibold text-gray-900 mb-3">5. How to request a refund</h2>
-            <p>If you believe you are eligible for a refund, email us at <strong>support@budmatch.site</strong> with:</p>
+            <p>If you believe you are eligible for a refund, email us at <strong>hello@budmatch.site</strong> with:</p>
             <ul className="list-disc pl-5 mt-2 space-y-1">
               <li>Your registered email address</li>
               <li>The match ID (visible on the listing page)</li>
@@ -59,7 +59,7 @@ export default function RefundPolicy() {
 
           <section>
             <h2 className="text-base font-semibold text-gray-900 mb-3">6. Contact</h2>
-            <p>For any payment or refund queries, contact us at <strong>support@budmatch.site</strong>.</p>
+            <p>For any payment or refund queries, contact us at <strong>hello@budmatch.site</strong>.</p>
           </section>
 
         </div>

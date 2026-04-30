@@ -42,7 +42,7 @@ async function notifyDealAgreed(matchId: string, agreedPrice: number) {
   if (!listings) return
   const { sellerListing, buyerListing } = listings
   const model = sellerListing.model
-  const fee = Math.max(100, Math.round(agreedPrice * 0.10))
+  const fee = Math.max(100, Math.round(agreedPrice * 0.05))
   const msg = `Deal confirmed at LKR ${agreedPrice.toLocaleString()} for ${model}. Pay LKR ${fee.toLocaleString()} within 24 hours to unlock chat.`
 
   await createNotification(sellerListing.user_email, 'deal_agreed', msg, sellerListing.id, matchId)
@@ -110,7 +110,7 @@ async function notifyMatchCancelled(matchId: string) {
   await createNotification(sellerListing.user_email, 'match_cancelled', msg, sellerListing.id, matchId)
   await createNotification(buyerListing.user_email, 'match_cancelled', msg, buyerListing.id, matchId)
 
-  const emailHtml = (listingId: string) => `
+  const emailHtml = () => `
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f5f5f0">
       <div style="background:#fff;border-radius:20px;padding:32px;border:1px solid #e8e8e8">
         <h2 style="color:#111;font-size:22px;margin:0 0 8px">Match cancelled ❌</h2>
@@ -126,8 +126,8 @@ async function notifyMatchCancelled(matchId: string) {
       </div>
     </div>`
 
-  await sendEmail(sellerListing.user_email, `Match cancelled — ${model}`, emailHtml(sellerListing.id))
-  await sendEmail(buyerListing.user_email, `Match cancelled — ${model}`, emailHtml(buyerListing.id))
+  await sendEmail(sellerListing.user_email, `Match cancelled — ${model}`, emailHtml())
+  await sendEmail(buyerListing.user_email, `Match cancelled — ${model}`, emailHtml())
 }
 
 async function cancelExpiredMatch(matchId: string) {
