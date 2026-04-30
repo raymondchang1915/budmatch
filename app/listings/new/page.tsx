@@ -286,7 +286,6 @@ export default function NewListing() {
               {[
                 { val: 'selling', label: 'Sell / Trade' },
                 { val: 'buying', label: 'Buy' },
-                { val: 'both', label: 'Either' },
               ].map(t => (
                 <button key={t.val}
                   onClick={() => setForm({ ...form, listing_type: t.val })}

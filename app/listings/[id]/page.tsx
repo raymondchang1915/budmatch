@@ -179,6 +179,41 @@ export default function ListingDetail() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  async function handleSwitchType() {
+    if (!listing || !currentUser) return
+    const newType = listing.listing_type === 'selling' ? 'buying' : 'selling'
+    const confirmMsg = listing.matched
+      ? `This will cancel your current match and relist you as ${newType}. The other party will be returned to the pool. Continue?`
+      : `Switch to ${newType}?`
+    if (!confirm(confirmMsg)) return
+
+    if (listing.matched && match) {
+      await supabase.from('matches').update({ status: 'cancelled' }).eq('id', match.id)
+      const otherListingId = match.listing_a === listing.id ? match.listing_b : match.listing_a
+      await supabase.from('listings').update({ matched: false }).eq('id', otherListingId)
+      const { data: otherListing } = await supabase
+        .from('listings').select('user_email, model').eq('id', otherListingId).single()
+      if (otherListing) {
+        await supabase.from('notifications').insert([{
+          user_email: otherListing.user_email,
+          type: 'match_cancelled',
+          message: `Your match for ${otherListing.model} was cancelled by the other party. You've been put back in the pool.`,
+          listing_id: otherListingId,
+          match_id: match.id,
+          read: false,
+        }])
+      }
+    }
+
+    await supabase.from('listings').update({ listing_type: newType, matched: false }).eq('id', listing.id)
+    await fetch('/api/match', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: listing.model }),
+    })
+    await loadData()
+  }
+
   async function loadData() {
     const { data: listingData } = await supabase.from('listings').select('*').eq('id', id).single()
     if (!listingData) { setLoading(false); return }
@@ -467,6 +502,28 @@ export default function ListingDetail() {
             <span>{listing.user_email.split('@')[0]}</span>
             <span>{new Date(listing.created_at).toLocaleDateString()}</span>
           </div>
+
+          {currentUser === listing.user_email && !listing.matched && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-xs text-gray-400 mb-2">
+                Currently: <strong className="text-gray-700 capitalize">{listing.listing_type}</strong>
+              </p>
+              <button type="button" onClick={handleSwitchType}
+                className="w-full border border-gray-200 text-gray-600 py-2.5 rounded-full text-sm hover:border-gray-400 transition">
+                Switch to {listing.listing_type === 'selling' ? 'buying' : 'selling'}
+              </button>
+            </div>
+          )}
+
+          {currentUser === listing.user_email && listing.matched && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-xs text-gray-400 mb-2">Want to switch from {listing.listing_type} to {listing.listing_type === 'selling' ? 'buying' : 'selling'}?</p>
+              <button type="button" onClick={handleSwitchType}
+                className="w-full border border-amber-200 text-amber-700 py-2.5 rounded-full text-sm hover:border-amber-400 transition">
+                Cancel match and switch to {listing.listing_type === 'selling' ? 'buying' : 'selling'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* No match yet */}
@@ -717,7 +774,7 @@ export default function ListingDetail() {
                       <span className="font-semibold text-gray-900">LKR {agreedPrice.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Your fee (10%)</span>
+                      <span className="text-gray-500">Your fee (5%)</span>
                       <span className="font-semibold text-gray-900">LKR {myFee.toLocaleString()}</span>
                     </div>
                   </div>
@@ -747,6 +804,13 @@ export default function ListingDetail() {
                       className="w-full bg-gray-900 text-white py-3.5 rounded-full text-sm font-medium hover:bg-black transition disabled:opacity-40">
                       {paying ? 'Processing...' : `Pay LKR ${myFee.toLocaleString()} to confirm →`}
                     </button>
+                  )}
+
+                  {!myRole && !bothPaid && (
+                    <a href={`/auth?redirect=/listings/${listing?.id}`}
+                      className="block w-full bg-gray-900 text-white py-3.5 rounded-full text-sm font-medium hover:bg-black transition text-center">
+                      Sign in to pay →
+                    </a>
                   )}
 
                   {userHasPaid && !bothPaid && (
