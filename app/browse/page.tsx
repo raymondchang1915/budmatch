@@ -263,13 +263,25 @@ export default function Browse() {
                 {/* Top row */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                   <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
-                    <h2 style={{
-                      fontSize: 15, fontWeight: 600, color: '#111',
-                      marginBottom: 3, fontFamily: 'system-ui',
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    }}>
-                      {listing.model}
-                    </h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                      <h2 style={{
+                        fontSize: 15, fontWeight: 600, color: '#111',
+                        fontFamily: 'system-ui',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>
+                        {listing.model}
+                      </h2>
+                      <span style={{
+                        fontSize: 11, fontWeight: 500, flexShrink: 0,
+                        padding: '2px 8px', borderRadius: 999,
+                        background: listing.listing_type === 'selling' ? '#eff6ff' : '#faf5ff',
+                        color: listing.listing_type === 'selling' ? '#1d4ed8' : '#7e22ce',
+                        border: `1px solid ${listing.listing_type === 'selling' ? '#bfdbfe' : '#e9d5ff'}`,
+                        fontFamily: 'system-ui',
+                      }}>
+                        {listing.listing_type === 'selling' ? 'Selling' : 'Buying'}
+                      </span>
+                    </div>
                     <p style={{ fontSize: 12, color: '#666', fontFamily: 'system-ui' }}>
                       📍 {listing.location || 'Location not set'}
                     </p>

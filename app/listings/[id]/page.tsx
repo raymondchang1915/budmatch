@@ -179,55 +179,6 @@ export default function ListingDetail() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  async function handleSwitchType() {
-    if (!listing || !currentUser) return
-
-    const newType = listing.listing_type === 'selling' ? 'buying' : 'selling'
-    const confirmMsg = listing.matched
-      ? `This will cancel your current match and switch you to ${newType}. The other party will be notified and returned to the pool. Continue?`
-      : `Switch to ${newType}? You'll be relisted and matched again.`
-
-    if (!confirm(confirmMsg)) return
-
-    if (listing.matched) {
-      const { data: activeMatches } = await supabase
-        .from('matches')
-        .select('*')
-        .or(`listing_a.eq.${listing.id},listing_b.eq.${listing.id}`)
-        .not('status', 'in', '("cancelled","paid")')
-
-      for (const m of activeMatches ?? []) {
-        await supabase.from('matches').update({ status: 'cancelled' }).eq('id', m.id)
-
-        const otherListingId = m.listing_a === listing.id ? m.listing_b : m.listing_a
-        await supabase.from('listings').update({ matched: false }).eq('id', otherListingId)
-
-        const { data: otherListing } = await supabase
-          .from('listings').select('user_email, model, id').eq('id', otherListingId).single()
-
-        if (otherListing) {
-          await supabase.from('notifications').insert([{
-            user_email: otherListing.user_email,
-            type: 'match_cancelled',
-            message: `Your match for ${otherListing.model} was cancelled by the other party. You've been put back in the matching pool.`,
-            listing_id: otherListing.id,
-            match_id: m.id,
-            read: false,
-          }])
-        }
-      }
-    }
-
-    await supabase.from('listings').update({ listing_type: newType, matched: false }).eq('id', listing.id)
-    await fetch('/api/match', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: listing.model }),
-    })
-
-    router.push(`/browse?switched=${listing.id}&type=${newType}`)
-  }
-
   async function loadData() {
     const { data: listingData } = await supabase.from('listings').select('*').eq('id', id).single()
     if (!listingData) { setLoading(false); return }
@@ -889,23 +840,7 @@ export default function ListingDetail() {
           </>
         )}
 
-        {/* Switch listing type */}
-        {currentUser === listing.user_email && match?.negotiation_status !== 'agreed' && !bothPaid && (
-          <div className="bg-white border border-amber-200 rounded-2xl p-5 shadow-sm">
-            <p className="text-sm font-medium text-gray-900 mb-1">
-              Switch to {listing.listing_type === 'selling' ? 'buying' : 'selling'}?
-            </p>
-            <p className="text-xs text-gray-400 mb-4">
-              {listing.matched
-                ? `This will cancel your current match. The other party will be notified and returned to the pool. Your listing will switch to ${listing.listing_type === 'selling' ? 'buying' : 'selling'}.`
-                : `Your listing will be switched to ${listing.listing_type === 'selling' ? 'buying' : 'selling'} and re-entered into matching.`}
-            </p>
-            <button type="button" onClick={handleSwitchType}
-              className="w-full border border-amber-200 text-amber-700 py-2.5 rounded-full text-sm font-medium hover:bg-amber-50 transition">
-              {listing.matched ? 'Cancel match and switch to' : 'Switch to'} {listing.listing_type === 'selling' ? 'buying' : 'selling'} →
-            </button>
-          </div>
-        )}
+
       </div>
     </main>
   )
