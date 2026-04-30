@@ -213,7 +213,7 @@ export default function Browse() {
                     }}>
                       {listing.model}
                     </h2>
-                    <p style={{ fontSize: 12, color: '#aaa', fontFamily: 'system-ui' }}>
+                    <p style={{ fontSize: 12, color: '#666', fontFamily: 'system-ui' }}>
                       📍 {listing.location || 'Location not set'}
                     </p>
                   </div>
@@ -285,7 +285,7 @@ export default function Browse() {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <a href={`/listings/${listing.id}`} style={{
                     flex: 1, border: '1px solid #e8e8e8',
-                    color: '#555', fontSize: 12,
+                    color: '#333', fontSize: 12,
                     padding: '9px 0', borderRadius: 999,
                     textAlign: 'center', textDecoration: 'none',
                     fontFamily: 'system-ui', fontWeight: 500,

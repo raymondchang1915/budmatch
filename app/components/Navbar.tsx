@@ -226,7 +226,7 @@ export default function Navbar() {
                       <div style={{ maxHeight: 360, overflowY: 'auto' }}>
                         {notifications.length === 0 ? (
                           <div style={{ padding: '32px 16px', textAlign: 'center' }}>
-                            <p style={{ fontSize: 13, color: '#bbb', fontFamily: 'system-ui' }}>
+                            <p style={{ fontSize: 13, color: '#888', fontFamily: 'system-ui' }}>
                               No notifications yet
                             </p>
                           </div>
@@ -256,7 +256,7 @@ export default function Navbar() {
                                 }}>
                                   {n.message}
                                 </p>
-                                <p style={{ fontSize: 11, color: '#bbb', margin: 0, fontFamily: 'system-ui' }}>
+                                <p style={{ fontSize: 11, color: '#888', margin: 0, fontFamily: 'system-ui' }}>
                                   {new Date(n.created_at).toLocaleDateString('en-GB', {
                                     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
                                   })}
@@ -277,7 +277,7 @@ export default function Navbar() {
                 </div>
 
                 <Link href="/profile" style={{
-                  fontSize: 13, color: '#444', fontWeight: 500,
+                  fontSize: 13, color: '#222', fontWeight: 500,
                   textDecoration: 'none', padding: '6px 14px',
                   borderRadius: 999, transition: 'background 0.15s',
                   fontFamily: 'system-ui, sans-serif',
@@ -288,7 +288,7 @@ export default function Navbar() {
                   {displayName}
                 </Link>
                 <button type="button" onClick={signOut} style={{
-                  fontSize: 13, color: '#666',
+                  fontSize: 13, color: '#333',
                   border: '1px solid #e0e0e0',
                   background: 'transparent',
                   padding: '6px 16px', borderRadius: 999,
@@ -304,7 +304,7 @@ export default function Navbar() {
             ) : (
               <>
                 <Link href="/auth" style={{
-                  fontSize: 13, color: '#666',
+                  fontSize: 13, color: '#333',
                   textDecoration: 'none', padding: '6px 14px',
                   fontFamily: 'system-ui, sans-serif',
                 }}>
@@ -422,7 +422,7 @@ export default function Navbar() {
             <div style={{ maxHeight: 300, overflowY: 'auto' }}>
               {notifications.length === 0 ? (
                 <div style={{ padding: '24px 16px', textAlign: 'center' }}>
-                  <p style={{ fontSize: 13, color: '#bbb', fontFamily: 'system-ui' }}>No notifications yet</p>
+                  <p style={{ fontSize: 13, color: '#888', fontFamily: 'system-ui' }}>No notifications yet</p>
                 </div>
               ) : (
                 notifications.map(n => (
@@ -440,7 +440,7 @@ export default function Navbar() {
                       <p style={{ fontSize: 12, color: '#333', margin: '0 0 2px', fontFamily: 'system-ui', lineHeight: 1.5 }}>
                         {n.message}
                       </p>
-                      <p style={{ fontSize: 11, color: '#bbb', margin: 0, fontFamily: 'system-ui' }}>
+                      <p style={{ fontSize: 11, color: '#888', margin: 0, fontFamily: 'system-ui' }}>
                         {new Date(n.created_at).toLocaleDateString('en-GB', {
                           day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
                         })}

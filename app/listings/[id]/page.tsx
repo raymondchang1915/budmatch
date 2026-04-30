@@ -442,7 +442,7 @@ export default function ListingDetail() {
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{listing.model}</h1>
-              <p className="text-gray-400 text-sm mt-0.5">{listing.location}</p>
+              <p className="text-gray-600 text-sm mt-0.5">{listing.location}</p>
             </div>
             <div className="flex flex-col items-end gap-2">
               <span className={`text-xs font-medium px-3 py-1.5 rounded-full border ${conditionColor}`}>
@@ -463,7 +463,7 @@ export default function ListingDetail() {
               <p className="text-gray-900 font-medium">{listing.needs_component}</p>
             </div>
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
+          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
             <span>{listing.user_email.split('@')[0]}</span>
             <span>{new Date(listing.created_at).toLocaleDateString()}</span>
           </div>
@@ -795,7 +795,7 @@ export default function ListingDetail() {
                               <div className={`max-w-xs rounded-2xl px-4 py-2.5 text-sm ${
                                 isMe ? 'bg-gray-900 text-white rounded-br-sm' : 'bg-gray-100 text-gray-800 rounded-bl-sm'
                               }`}>
-                                {!isMe && <p className="text-xs opacity-50 mb-1">{msg.sender_email.split('@')[0]}</p>}
+                                {!isMe && <p className="text-xs text-gray-500 mb-1">{msg.sender_email.split('@')[0]}</p>}
                                 {msg.content}
                               </div>
                             </div>
@@ -806,11 +806,11 @@ export default function ListingDetail() {
                   </div>
                   <div className="px-6 pb-3 flex gap-2">
                     <a href="https://pickme.lk" target="_blank" rel="noopener noreferrer"
-                      className="flex-1 border border-gray-200 text-gray-500 text-xs py-2.5 rounded-full text-center hover:border-gray-400 transition">
+                      className="flex-1 border border-gray-200 text-gray-700 text-xs py-2.5 rounded-full text-center hover:border-gray-400 transition">
                       📦 PickMe
                     </a>
                     <a href="https://www.uber.com/lk/en/ride/uber-connect/" target="_blank" rel="noopener noreferrer"
-                      className="flex-1 border border-gray-200 text-gray-500 text-xs py-2.5 rounded-full text-center hover:border-gray-400 transition">
+                      className="flex-1 border border-gray-200 text-gray-700 text-xs py-2.5 rounded-full text-center hover:border-gray-400 transition">
                       🚗 Uber Connect
                     </a>
                   </div>
