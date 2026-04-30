@@ -27,9 +27,25 @@ export default function Browse() {
   const [offerPrice, setOfferPrice] = useState('')
   const [offerSent, setOfferSent] = useState(false)
   const [offerLoading, setOfferLoading] = useState(false)
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null)
+  const [userMatchedModels, setUserMatchedModels] = useState<string[]>([])
 
   useEffect(() => { fetchListings() }, [])
   useEffect(() => { applyFilters() }, [listings, tab, search])
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data }) => {
+      const email = data.user?.email ?? null
+      setCurrentUserEmail(email)
+      if (email) {
+        const { data: matchedListings } = await supabase
+          .from('listings')
+          .select('model')
+          .eq('user_email', email)
+          .eq('matched', true)
+        setUserMatchedModels((matchedListings ?? []).map(l => l.model))
+      }
+    })
+  }, [])
 
   const fetchListings = async () => {
     const { data } = await supabase
@@ -325,22 +341,28 @@ export default function Browse() {
                   >
                     View listing
                   </a>
-                  <button
-                    type="button"
-                    onClick={() => { setOfferModal(listing); setOfferSent(false); setOfferPrice('') }}
-                    style={{
-                      flex: 1, background: '#111',
-                      color: '#fff', fontSize: 12,
-                      padding: '9px 0', borderRadius: 999,
-                      border: 'none', cursor: 'pointer',
-                      fontFamily: 'system-ui', fontWeight: 500,
-                      transition: 'background 0.15s',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#000')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '#111')}
-                  >
-                    Make offer
-                  </button>
+                  {currentUserEmail && listing.user_email !== currentUserEmail && (
+                    userMatchedModels.includes(listing.model)
+                      ? <p style={{ flex: 1, fontSize: 11, color: '#aaa', textAlign: 'center', padding: '9px 0', fontFamily: 'system-ui' }}>
+                          You have an active match for this model
+                        </p>
+                      : <button
+                          type="button"
+                          onClick={() => { setOfferModal(listing); setOfferSent(false); setOfferPrice('') }}
+                          style={{
+                            flex: 1, background: '#111',
+                            color: '#fff', fontSize: 12,
+                            padding: '9px 0', borderRadius: 999,
+                            border: 'none', cursor: 'pointer',
+                            fontFamily: 'system-ui', fontWeight: 500,
+                            transition: 'background 0.15s',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#000')}
+                          onMouseLeave={e => (e.currentTarget.style.background = '#111')}
+                        >
+                          Make offer
+                        </button>
+                  )}
                 </div>
               </div>
             ))}
