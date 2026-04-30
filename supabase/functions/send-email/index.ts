@@ -10,22 +10,20 @@ serve(async (req: Request) => {
     const { user, email_data } = payload
     const to = user.email
     const subject = email_data?.subject ?? 'Confirm your BudMatch account'
+    const confirmUrl = `https://budmatch.site/auth/confirm?token_hash=${email_data?.token_hash}&type=email`
+
     const html = `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f5f5f0">
         <div style="background:#fff;border-radius:20px;padding:32px;border:1px solid #e8e8e8">
           <h2 style="color:#111;font-size:22px;margin:0 0 8px;font-weight:600">Welcome to BudMatch 👋</h2>
           <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 24px">
-            ${email_data?.token_hash
-              ? `Your confirmation code is <strong style="font-size:24px;color:#111">${email_data.token}</strong>`
-              : `Click below to confirm your account.`}
+            Click the button below to confirm your account and start finding your missing bud.
           </p>
-          ${email_data?.confirmation_url
-            ? `<a href="${email_data.confirmation_url}"
-                 style="display:inline-block;background:#111;color:#fff;padding:12px 28px;border-radius:999px;text-decoration:none;font-size:13px;font-weight:500">
-                 Confirm account →
-               </a>`
-            : ''}
-          <p style="color:#bbb;font-size:11px;margin-top:28px">BudMatch · Sri Lanka</p>
+          <a href="${confirmUrl}"
+             style="display:inline-block;background:#111;color:#fff;padding:12px 28px;border-radius:999px;text-decoration:none;font-size:13px;font-weight:500">
+            Confirm my account →
+          </a>
+          <p style="color:#bbb;font-size:11px;margin-top:28px">BudMatch · Sri Lanka · If you didn't sign up, ignore this email.</p>
         </div>
       </div>`
 

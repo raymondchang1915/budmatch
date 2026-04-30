@@ -178,7 +178,7 @@ export default function ShopDashboard() {
           </p>
           <div className="bg-white/10 rounded-xl p-4 text-sm">
             <p className="text-gray-300">
-              "Post your broken earbuds on <strong className="text-white">budmatch.vercel.app</strong> and enter code <strong className="text-white">{shop.shop_code}</strong> to get matched with someone near you!"
+              "Post your broken earbuds on <strong className="text-white">budmatch.site</strong> and enter code <strong className="text-white">{shop.shop_code}</strong> to get matched with someone near you!"
             </p>
           </div>
         </div>
