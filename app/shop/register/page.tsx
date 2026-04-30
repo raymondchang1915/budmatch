@@ -60,18 +60,24 @@ export default function ShopRegister() {
     if (!form.email) return
     setOtpSending(true)
     setOtpError('')
-    const code = Math.floor(100000 + Math.random() * 900000).toString()
-    setOtpCode(code)
-    const { error } = await supabase.functions.invoke('send-email', {
-      body: {
-        to: form.email,
-        subject: 'BudMatch — Verify your shop email',
-        html: `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2 style="color:#111">BudMatch Shop Verification</h2><p style="color:#444">Your verification code is:</p><div style="font-size:2rem;font-weight:bold;letter-spacing:0.25em;background:#f5f5f0;padding:1rem 2rem;border-radius:12px;display:inline-block;color:#111">${code}</div><p style="color:#888;font-size:0.875rem;margin-top:1rem">Valid for this session only. Do not share this code.</p></div>`,
-      },
-    })
+    try {
+      const res = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setOtpError('Failed to send code. Please check your email address.')
+        setOtpSending(false)
+        return
+      }
+      setOtpCode(data.code)
+      setOtpSent(true)
+    } catch {
+      setOtpError('Failed to send code. Please try again.')
+    }
     setOtpSending(false)
-    if (error) { setOtpError('Failed to send code. Please check your email address.'); return }
-    setOtpSent(true)
   }
 
   const verifyOtp = () => {
