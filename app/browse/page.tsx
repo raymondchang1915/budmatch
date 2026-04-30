@@ -33,6 +33,18 @@ export default function Browse() {
   useEffect(() => { fetchListings() }, [])
   useEffect(() => { applyFilters() }, [listings, tab, search])
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const switchedId = params.get('switched')
+    const switchedType = params.get('type')
+    if (switchedId && switchedType) {
+      setTab(switchedType === 'buying' ? 'buying' : 'selling')
+      setTimeout(() => {
+        const el = document.getElementById(`listing-${switchedId}`)
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 500)
+    }
+  }, [])
+  useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       const email = data.user?.email ?? null
       setCurrentUserEmail(email)
@@ -230,7 +242,7 @@ export default function Browse() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {filtered.map(listing => (
-              <div key={listing.id} style={{
+              <div key={listing.id} id={`listing-${listing.id}`} style={{
                 background: '#fff',
                 border: '1px solid #e8e8e8',
                 borderRadius: 20, padding: '20px 22px',
