@@ -816,7 +816,7 @@ export default function ListingDetail() {
                   </div>
                   <div className="px-6 pb-6 flex gap-2">
                     <input type="text" placeholder="Type a message..."
-                      className="flex-1 bg-gray-50 border border-gray-200 rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      className="flex-1 bg-gray-50 border border-gray-200 rounded-full px-5 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
                       value={newMessage}
                       onChange={e => setNewMessage(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}

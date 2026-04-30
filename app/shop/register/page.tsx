@@ -24,8 +24,14 @@ export default function ShopRegister() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<string | null>(null)
+  const [otpSending, setOtpSending] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+  const [otpInput, setOtpInput] = useState('')
+  const [otpVerified, setOtpVerified] = useState(false)
+  const [otpError, setOtpError] = useState('')
 
-  const inputClass = "w-full bg-white border border-gray-200 rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 shadow-sm"
+  const inputClass = "w-full bg-white border border-gray-200 rounded-full px-5 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 shadow-sm"
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5 ml-1"
 
   const captureGPS = () => {
@@ -50,7 +56,35 @@ export default function ShopRegister() {
     )
   }
 
+  const sendOtp = async () => {
+    if (!form.email) return
+    setOtpSending(true)
+    setOtpError('')
+    const code = Math.floor(100000 + Math.random() * 900000).toString()
+    setOtpCode(code)
+    const { error } = await supabase.functions.invoke('send-email', {
+      body: {
+        to: form.email,
+        subject: 'BudMatch — Verify your shop email',
+        html: `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2 style="color:#111">BudMatch Shop Verification</h2><p style="color:#444">Your verification code is:</p><div style="font-size:2rem;font-weight:bold;letter-spacing:0.25em;background:#f5f5f0;padding:1rem 2rem;border-radius:12px;display:inline-block;color:#111">${code}</div><p style="color:#888;font-size:0.875rem;margin-top:1rem">Valid for this session only. Do not share this code.</p></div>`,
+      },
+    })
+    setOtpSending(false)
+    if (error) { setOtpError('Failed to send code. Please check your email address.'); return }
+    setOtpSent(true)
+  }
+
+  const verifyOtp = () => {
+    if (otpInput.trim() === otpCode) {
+      setOtpVerified(true)
+      setOtpError('')
+    } else {
+      setOtpError('Incorrect code. Please try again.')
+    }
+  }
+
   const handleSubmit = async () => {
+    if (!otpVerified) { setError('Please verify your email first.'); return }
     if (!coords) { setError('Please capture your shop GPS location first.'); return }
     setLoading(true)
     setError('')
@@ -106,27 +140,58 @@ export default function ShopRegister() {
         <div className="flex flex-col gap-5">
 
           <div>
-            <label className={labelClass}>Shop name</label>
-            <input type="text" placeholder="e.g. Tech Hub Colombo" className={inputClass}
+            <label className={labelClass}>Shop name <span className="text-red-400">*</span></label>
+            <input type="text" placeholder="e.g. Tech Hub Colombo" className={inputClass} required
               value={form.shop_name} onChange={e => setForm({ ...form, shop_name: e.target.value })} />
           </div>
 
           <div>
-            <label className={labelClass}>Owner name</label>
-            <input type="text" placeholder="Your full name" className={inputClass}
+            <label className={labelClass}>Owner name <span className="text-red-400">*</span></label>
+            <input type="text" placeholder="Your full name" className={inputClass} required
               value={form.owner_name} onChange={e => setForm({ ...form, owner_name: e.target.value })} />
           </div>
 
           <div>
-            <label className={labelClass}>Phone</label>
-            <input type="tel" placeholder="+94 77 000 0000" className={inputClass}
+            <label className={labelClass}>Phone <span className="text-red-400">*</span></label>
+            <input type="tel" placeholder="+94 77 000 0000" className={inputClass} required
               value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
           </div>
 
           <div>
-            <label className={labelClass}>Email</label>
-            <input type="email" placeholder="shop@example.com" className={inputClass}
-              value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+            <label className={labelClass}>Email <span className="text-red-400">*</span></label>
+            <div className="flex gap-2 items-start">
+              <input type="email" placeholder="shop@example.com"
+                className={`${inputClass} flex-1`} required
+                value={form.email}
+                onChange={e => { setForm({ ...form, email: e.target.value }); setOtpSent(false); setOtpVerified(false); setOtpInput('') }}
+                disabled={otpVerified} />
+              {!otpVerified ? (
+                <button type="button" onClick={sendOtp}
+                  disabled={!form.email || otpSending}
+                  className="shrink-0 bg-gray-900 text-white px-4 py-3 rounded-full text-sm font-medium hover:bg-black transition disabled:opacity-40">
+                  {otpSending ? '…' : otpSent ? 'Resend' : 'Verify'}
+                </button>
+              ) : (
+                <span className="shrink-0 flex items-center text-sm text-green-700 font-medium px-3 py-3">✓ Verified</span>
+              )}
+            </div>
+            {otpSent && !otpVerified && (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs text-gray-500 ml-1">Enter the 6-digit code sent to <strong className="text-gray-700">{form.email}</strong></p>
+                <div className="flex gap-2">
+                  <input type="text" placeholder="000000" maxLength={6}
+                    className={`${inputClass} flex-1 tracking-widest text-center font-mono`}
+                    value={otpInput}
+                    onChange={e => setOtpInput(e.target.value.replace(/\D/g, ''))} />
+                  <button type="button" onClick={verifyOtp}
+                    disabled={otpInput.length !== 6}
+                    className="shrink-0 bg-gray-900 text-white px-4 py-3 rounded-full text-sm font-medium hover:bg-black transition disabled:opacity-40">
+                    Confirm
+                  </button>
+                </div>
+                {otpError && <p className="text-xs text-red-500 ml-1">{otpError}</p>}
+              </div>
+            )}
           </div>
 
           {/* GPS location */}
@@ -221,7 +286,7 @@ export default function ShopRegister() {
           {error && <p className="text-red-500 text-sm ml-1">{error}</p>}
 
           <button type="button" onClick={handleSubmit}
-            disabled={loading || !form.shop_name || !form.owner_name || !form.phone || !form.email || !form.registration_number || gpsStatus !== 'done'}
+            disabled={loading || !form.shop_name || !form.owner_name || !form.phone || !form.email || !otpVerified || !form.registration_number || gpsStatus !== 'done'}
             className="bg-gray-900 text-white py-3.5 rounded-full font-medium hover:bg-black transition disabled:opacity-40 text-sm">
             {loading ? 'Submitting...' : 'Apply now →'}
           </button>
