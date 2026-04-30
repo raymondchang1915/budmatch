@@ -189,30 +189,32 @@ export default function ListingDetail() {
 
     if (!confirm(confirmMsg)) return
 
-    if (listing.matched && match) {
-      await supabase.from('matches').update({ status: 'cancelled' }).eq('id', match.id)
-      const otherListingId = match.listing_a === listing.id ? match.listing_b : match.listing_a
-      await supabase.from('listings').update({ matched: false }).eq('id', otherListingId)
-      const { data: otherListing } = await supabase
-        .from('listings').select('user_email, model, id').eq('id', otherListingId).single()
-      if (otherListing) {
-        await supabase.from('notifications').insert([{
-          user_email: otherListing.user_email,
-          type: 'match_cancelled',
-          message: `Your match for ${otherListing.model} was cancelled by the other party. You've been put back in the matching pool.`,
-          listing_id: otherListing.id,
-          match_id: match.id,
-          read: false,
-        }])
-        await fetch('/api/negotiate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            match_id: match.id,
-            action: 'notify_payment',
-            role: myRole === 'buyer' ? 'seller' : 'buyer',
-          }),
-        })
+    if (listing.matched) {
+      const { data: activeMatches } = await supabase
+        .from('matches')
+        .select('*')
+        .or(`listing_a.eq.${listing.id},listing_b.eq.${listing.id}`)
+        .not('status', 'in', '("cancelled","paid")')
+
+      for (const m of activeMatches ?? []) {
+        await supabase.from('matches').update({ status: 'cancelled' }).eq('id', m.id)
+
+        const otherListingId = m.listing_a === listing.id ? m.listing_b : m.listing_a
+        await supabase.from('listings').update({ matched: false }).eq('id', otherListingId)
+
+        const { data: otherListing } = await supabase
+          .from('listings').select('user_email, model, id').eq('id', otherListingId).single()
+
+        if (otherListing) {
+          await supabase.from('notifications').insert([{
+            user_email: otherListing.user_email,
+            type: 'match_cancelled',
+            message: `Your match for ${otherListing.model} was cancelled by the other party. You've been put back in the matching pool.`,
+            listing_id: otherListing.id,
+            match_id: m.id,
+            read: false,
+          }])
+        }
       }
     }
 
