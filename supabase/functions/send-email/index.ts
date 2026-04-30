@@ -15,7 +15,7 @@ serve(async (req: Request) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'BudMatch <onboarding@resend.dev>', // use own domain once verified
+      from: 'BudMatch <hello@budmatch.site>',
       to,
       subject,
       html,
