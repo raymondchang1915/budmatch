@@ -62,6 +62,7 @@ export default function Browse() {
   const fetchListings = async () => {
     const { data } = await supabase
       .from('listings').select('*')
+      .eq('matched', false)
       .order('created_at', { ascending: false })
     setListings(data ?? [])
     setLoading(false)

@@ -310,6 +310,7 @@ export default function OfferMatchPage() {
         )}
 
         {/* Chat */}
+        {(currentUser === match.buyer_email || currentUser === match.seller_email) && (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
           <div className="px-6 pt-6 pb-4 border-b border-gray-100">
             <h2 className="text-lg font-semibold text-gray-900">Chat</h2>
@@ -368,6 +369,7 @@ export default function OfferMatchPage() {
             </>
           )}
         </div>
+        )}
       </div>
     </main>
   )

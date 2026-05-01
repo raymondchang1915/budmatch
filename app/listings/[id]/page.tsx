@@ -524,14 +524,19 @@ export default function ListingDetail() {
 
         </div>
 
-        {/* No match yet */}
-        {!listing.matched || !match ? (
+        {/* Listing owner only — waiting for match */}
+        {currentUser === listing.user_email && !match && (
           <div className="bg-white border border-gray-200 rounded-2xl px-7 py-12 text-center shadow-sm">
             <div className="text-3xl mb-3">⏳</div>
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Looking for your match</h2>
-            <p className="text-gray-400 text-sm max-w-xs mx-auto">We'll notify you when someone compatible is found.</p>
+            <p className="text-gray-400 text-sm max-w-xs mx-auto">
+              We'll notify you when someone compatible is found.
+            </p>
           </div>
-        ) : (
+        )}
+
+        {/* Only matched parties see the full UI */}
+        {myRole && match && (
           <>
             {/* Match banner */}
             <div className={`rounded-2xl px-6 py-4 flex items-center gap-3 text-sm font-medium border ${
@@ -821,6 +826,7 @@ export default function ListingDetail() {
             )}
 
             {/* Chat */}
+            {myRole && (
             <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
               <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-center justify-between">
                 <div>
@@ -891,6 +897,7 @@ export default function ListingDetail() {
                 </>
               )}
             </div>
+            )}
           </>
         )}
 

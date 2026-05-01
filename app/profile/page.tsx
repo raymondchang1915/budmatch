@@ -143,37 +143,21 @@ export default function Profile() {
   async function handleDeleteListing(listingId: string) {
     if (!confirm('Delete this listing?')) return
 
-    const { data: allMatches } = await supabase
+    const { data: activeMatches } = await supabase
       .from('matches')
-      .select('*')
+      .select('listing_a, listing_b')
       .or(`listing_a.eq.${listingId},listing_b.eq.${listingId}`)
+      .not('status', 'in', '(cancelled,paid)')
 
-    for (const m of allMatches ?? []) {
-      if (m.status !== 'cancelled' && m.status !== 'paid') {
-        const otherListingId = m.listing_a === listingId ? m.listing_b : m.listing_a
-        await supabase.from('listings').update({ matched: false }).eq('id', otherListingId)
-        const { data: otherListing } = await supabase
-          .from('listings').select('user_email, model, id').eq('id', otherListingId).single()
-        if (otherListing) {
-          await supabase.from('notifications').insert([{
-            user_email: otherListing.user_email,
-            type: 'match_cancelled',
-            message: `Your match for ${otherListing.model} was cancelled. You've been put back in the pool.`,
-            listing_id: otherListing.id,
-            match_id: null,
-            read: false,
-          }])
-        }
-      }
-      await supabase.from('messages').delete().eq('match_id', m.id)
-      await supabase.from('notifications').delete().eq('match_id', m.id)
-      await supabase.from('matches').delete().eq('id', m.id)
+    for (const m of activeMatches ?? []) {
+      const otherListingId = m.listing_a === listingId ? m.listing_b : m.listing_a
+      await supabase.from('listings').update({ matched: false }).eq('id', otherListingId)
     }
 
-    await supabase.from('notifications').delete().eq('listing_id', listingId)
-    await supabase.from('offers').delete().eq('listing_id', listingId)
-    await supabase.from('listings').delete().eq('id', listingId)
-    setListings(prev => prev.filter(l => l.id !== listingId))
+    const { error } = await supabase.from('listings').delete().eq('id', listingId)
+    if (error) { alert('Delete failed: ' + error.message); return }
+
+    await fetchUserData(user.email)
   }
 
   async function handleSaveEdit(listingId: string, model: string) {
