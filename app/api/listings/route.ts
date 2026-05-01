@@ -6,6 +6,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+async function sendEmail(to: string, subject: string, html: string) {
+  try {
+    await supabase.functions.invoke('send-email', { body: { to, subject, html } })
+  } catch (e) { console.error('Email error:', e) }
+}
+
 export async function DELETE(req: NextRequest) {
   const { listing_id, user_email } = await req.json()
 
@@ -48,7 +54,7 @@ export async function DELETE(req: NextRequest) {
       .from('matches')
       .select('id, listing_a, listing_b')
       .or(`listing_a.eq.${listing_id},listing_b.eq.${listing_id}`)
-      .in('status', ['pending', 'negotiating'])
+      .eq('status', 'pending')
 
     console.log('Active matches:', activeMatches)
 
@@ -57,6 +63,7 @@ export async function DELETE(req: NextRequest) {
       const otherListingId = match.listing_a === listing_id ? match.listing_b : match.listing_a
 
       await supabase.from('listings').update({ matched: false }).eq('id', otherListingId)
+      await supabase.from('matches').update({ status: 'cancelled' }).eq('id', match.id)
 
       const { data: otherListing } = await supabase
         .from('listings')
@@ -65,14 +72,25 @@ export async function DELETE(req: NextRequest) {
         .single()
 
       if (otherListing) {
+        const msg = `Your match for the ${listing.model} was cancelled — the other party deleted their listing. We've put you back in the pool and will find you a new match soon.`
+
         await supabase.from('notifications').insert([{
           user_email: otherListing.user_email,
           type: 'match_cancelled',
-          message: `The other party deleted their ${listing.model} listing. You've been put back in the matching pool and we'll find you a new match soon.`,
+          message: msg,
           listing_id: otherListing.id,
           match_id: match.id,
           read: false,
         }])
+
+        await sendEmail(
+          otherListing.user_email,
+          `Match cancelled — ${listing.model}`,
+          `<p>Hi,</p>
+          <p>${msg}</p>
+          <p>Head to your <a href="https://budmatch.com/profile">profile</a> to check your listing status.</p>
+          <p>— The BudMatch team</p>`
+        )
       }
     }
 
