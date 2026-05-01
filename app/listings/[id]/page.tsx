@@ -179,6 +179,48 @@ export default function ListingDetail() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  async function handleDeleteAndRepost() {
+    if (!listing || !currentUser) return
+
+    const confirmMsg = listing.matched
+      ? `This will delete your listing and cancel your current match. The other party will be returned to the pool. You'll be redirected to post a new listing. Continue?`
+      : `Delete this listing and post a new one?`
+
+    if (!confirm(confirmMsg)) return
+
+    const { data: activeMatches } = await supabase
+      .from('matches')
+      .select('*')
+      .or(`listing_a.eq.${listing.id},listing_b.eq.${listing.id}`)
+      .not('status', 'in', '("cancelled","paid")')
+
+    for (const m of activeMatches ?? []) {
+      await supabase.from('matches').update({ status: 'cancelled' }).eq('id', m.id)
+
+      const otherListingId = m.listing_a === listing.id ? m.listing_b : m.listing_a
+      await supabase.from('listings').update({ matched: false }).eq('id', otherListingId)
+
+      const { data: otherListing } = await supabase
+        .from('listings').select('user_email, model, id').eq('id', otherListingId).single()
+
+      if (otherListing) {
+        await supabase.from('notifications').insert([{
+          user_email: otherListing.user_email,
+          type: 'match_cancelled',
+          message: `Your match for ${otherListing.model} was cancelled by the other party. You've been put back in the matching pool.`,
+          listing_id: otherListing.id,
+          match_id: m.id,
+          read: false,
+        }])
+      }
+    }
+
+    await supabase.from('offers').delete().eq('listing_id', listing.id)
+    await supabase.from('listings').delete().eq('id', listing.id)
+
+    router.push('/listings/new')
+  }
+
   async function loadData() {
     const { data: listingData } = await supabase.from('listings').select('*').eq('id', id).single()
     if (!listingData) { setLoading(false); return }
@@ -840,7 +882,25 @@ export default function ListingDetail() {
           </>
         )}
 
-
+        {currentUser === listing.user_email && match?.negotiation_status !== 'agreed' && !bothPaid && (
+          <div className="bg-white border border-amber-200 rounded-2xl p-5 shadow-sm">
+            <p className="text-sm font-medium text-gray-900 mb-1">
+              Want to switch to {listing.listing_type === 'selling' ? 'buying' : 'selling'}?
+            </p>
+            <p className="text-xs text-gray-400 mb-4">
+              {listing.matched
+                ? 'This will delete this listing, cancel your match, and let you post a new one. The other party will be notified.'
+                : 'Your current listing will be deleted and you can post a fresh one.'}
+            </p>
+            <button
+              type="button"
+              onClick={handleDeleteAndRepost}
+              className="w-full border border-amber-200 text-amber-700 py-2.5 rounded-full text-sm font-medium hover:bg-amber-50 transition"
+            >
+              Delete and post new listing →
+            </button>
+          </div>
+        )}
       </div>
     </main>
   )
