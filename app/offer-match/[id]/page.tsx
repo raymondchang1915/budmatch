@@ -117,30 +117,36 @@ export default function OfferMatchPage() {
     if (!currentUser || !match) return
     setPaying(true)
 
-    const isBuyer = currentUser === match.buyer_email
-    const field = isBuyer ? 'buyer_paid' : 'seller_paid'
-    await supabase.from('matches').update({ [field]: true }).eq('id', match.id)
+    const role = currentUser === match.buyer_email ? 'buyer' : 'seller'
 
-    const updatedBuyerPaid = isBuyer ? true : match.buyer_paid
-    const updatedSellerPaid = !isBuyer ? true : match.seller_paid
+    const res = await fetch('/api/payhere', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ match_id: match.id, payer_email: currentUser, role }),
+    })
 
-    if (updatedBuyerPaid && updatedSellerPaid) {
-      await supabase.from('matches').update({ status: 'paid' }).eq('id', match.id)
-    } else {
-      await fetch('/api/negotiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          match_id: match.id,
-          action: 'notify_payment',
-          role: isBuyer ? 'buyer' : 'seller',
-        }),
-      })
+    const data = await res.json()
+    if (data.error) {
+      alert(data.error)
+      setPaying(false)
+      return
     }
 
-    const { data: fresh } = await supabase.from('matches').select('*').eq('id', match.id).single()
-    if (fresh) setMatch(fresh)
-    setPaying(false)
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = data.checkout_url
+    form.style.display = 'none'
+
+    for (const [key, value] of Object.entries(data.params)) {
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = key
+      input.value = String(value)
+      form.appendChild(input)
+    }
+
+    document.body.appendChild(form)
+    form.submit()
   }
 
   async function sendMessage() {

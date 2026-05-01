@@ -147,7 +147,7 @@ export default function Profile() {
       .from('matches')
       .select('*')
       .or(`listing_a.eq.${listingId},listing_b.eq.${listingId}`)
-      .not('status', 'in', '("cancelled","paid")')
+      .not('status', 'in', '(cancelled,paid)')
 
     for (const m of activeMatches ?? []) {
       await supabase.from('matches').update({ status: 'cancelled' }).eq('id', m.id)

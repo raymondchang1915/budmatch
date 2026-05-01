@@ -330,23 +330,35 @@ export default function ListingDetail() {
   async function handlePayment() {
     if (!currentUser || !match || !myRole) return
     setPaying(true)
-    const field = myRole === 'buyer' ? 'buyer_paid' : 'seller_paid'
-    await supabase.from('matches').update({ [field]: true }).eq('id', match.id)
 
-    const updatedBuyerPaid = myRole === 'buyer' ? true : match.buyer_paid
-    const updatedSellerPaid = myRole === 'seller' ? true : match.seller_paid
+    const res = await fetch('/api/payhere', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ match_id: match.id, payer_email: currentUser, role: myRole }),
+    })
 
-    if (updatedBuyerPaid && updatedSellerPaid) {
-      await supabase.from('matches').update({ status: 'paid' }).eq('id', match.id)
-    } else {
-      await fetch('/api/negotiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ match_id: match.id, action: 'notify_payment', role: myRole }),
-      })
+    const data = await res.json()
+    if (data.error) {
+      alert(data.error)
+      setPaying(false)
+      return
     }
-    await refreshMatch()
-    setPaying(false)
+
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = data.checkout_url
+    form.style.display = 'none'
+
+    for (const [key, value] of Object.entries(data.params)) {
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = key
+      input.value = String(value)
+      form.appendChild(input)
+    }
+
+    document.body.appendChild(form)
+    form.submit()
   }
 
   async function sendMessage() {
