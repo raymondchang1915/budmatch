@@ -171,21 +171,21 @@ export default function Profile() {
  
 
   async function handleSaveEdit(listingId: string, model: string) {
-    await supabase.from('listings').update({
-      condition: editForm.condition,
-      location: editForm.location,
-      asking_price: editForm.asking_price ? parseInt(editForm.asking_price) : null,
-    }).eq('id', listingId)
+  await supabase.from('listings').update({
+    condition: editForm.condition,
+    location: editForm.location,
+    // removed asking_price
+  }).eq('id', listingId)
 
-    await fetch('/api/match', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model }),
-    })
+  await fetch('/api/match', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model }),
+  })
 
-    setEditingId(null)
-    fetchUserData(user.email)
-  }
+  setEditingId(null)
+  fetchUserData(user.email)
+}
 
   if (loading) return (
     <main className="min-h-screen bg-[#f5f5f0] flex items-center justify-center">
