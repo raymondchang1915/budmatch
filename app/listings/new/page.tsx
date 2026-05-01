@@ -176,8 +176,12 @@ export default function NewListing() {
   }
 
   const handleSubmit = async () => {
-    if (!form.model || !form.has_component || !form.condition || !form.user_email) {
+    if (!form.model || !form.has_component || !form.condition || !form.listing_type || !form.user_email) {
       setError('Please fill in all required fields')
+      return
+    }
+    if (!form.year_of_purchase) {
+      setError('Please select year of purchase')
       return
     }
     setLoading(true)
@@ -377,15 +381,12 @@ export default function NewListing() {
 
           {/* Year of purchase */}
           <div>
-            <label className={labelClass}>Year purchased (optional)</label>
+            <label className={labelClass}>Year purchased *</label>
             <select className={selectClass} value={form.year_of_purchase}
               onChange={e => setForm({ ...form, year_of_purchase: e.target.value })}>
               <option value="">Select year</option>
               {years.map(y => <option key={y}>{y}</option>)}
             </select>
-            <p className="text-xs text-gray-400 mt-1 ml-1">
-              Helps calculate a fair price
-            </p>
           </div>
 
           {/* Location */}
@@ -409,7 +410,7 @@ export default function NewListing() {
           {error && <p className="text-red-500 text-sm ml-1">{error}</p>}
 
           <button onClick={handleSubmit}
-            disabled={loading || !form.model || !form.has_component || !form.condition}
+            disabled={loading || !form.model || !form.has_component || !form.condition || !form.listing_type || !form.year_of_purchase}
             className="bg-gray-900 text-white py-3.5 rounded-full font-medium hover:bg-black transition disabled:opacity-40 text-sm">
             {loading ? 'Posting...' : 'Post listing →'}
           </button>

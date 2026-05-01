@@ -48,6 +48,10 @@ export default function Profile() {
   const [incomingOffers, setIncomingOffers] = useState<Offer[]>([])
   const [sentOffers, setSentOffers] = useState<Offer[]>([])
   const [offerLoading, setOfferLoading] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<{ condition: string; location: string; asking_price: string }>({
+    condition: '', location: '', asking_price: '',
+  })
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -136,9 +140,53 @@ export default function Profile() {
     setIncomingOffers(prev => prev.filter(o => o.id !== offerId))
   }
 
-  const deleteListing = async (id: string) => {
-    await supabase.from('listings').delete().eq('id', id)
-    setListings(prev => prev.filter(l => l.id !== id))
+  async function handleDeleteListing(listingId: string) {
+    if (!confirm('Delete this listing?')) return
+
+    const { data: activeMatches } = await supabase
+      .from('matches')
+      .select('*')
+      .or(`listing_a.eq.${listingId},listing_b.eq.${listingId}`)
+      .not('status', 'in', '("cancelled","paid")')
+
+    for (const m of activeMatches ?? []) {
+      await supabase.from('matches').update({ status: 'cancelled' }).eq('id', m.id)
+      const otherListingId = m.listing_a === listingId ? m.listing_b : m.listing_a
+      await supabase.from('listings').update({ matched: false }).eq('id', otherListingId)
+      const { data: otherListing } = await supabase
+        .from('listings').select('user_email, model, id').eq('id', otherListingId).single()
+      if (otherListing) {
+        await supabase.from('notifications').insert([{
+          user_email: otherListing.user_email,
+          type: 'match_cancelled',
+          message: `Your match for ${otherListing.model} was cancelled. You've been put back in the pool.`,
+          listing_id: otherListing.id,
+          match_id: m.id,
+          read: false,
+        }])
+      }
+    }
+
+    await supabase.from('offers').delete().eq('listing_id', listingId)
+    await supabase.from('listings').delete().eq('id', listingId)
+    setListings(prev => prev.filter(l => l.id !== listingId))
+  }
+
+  async function handleSaveEdit(listingId: string, model: string) {
+    await supabase.from('listings').update({
+      condition: editForm.condition,
+      location: editForm.location,
+      asking_price: editForm.asking_price ? parseInt(editForm.asking_price) : null,
+    }).eq('id', listingId)
+
+    await fetch('/api/match', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model }),
+    })
+
+    setEditingId(null)
+    fetchUserData(user.email)
   }
 
   if (loading) return (
@@ -274,20 +322,60 @@ export default function Profile() {
                       Needs <strong>{listing.needs_component}</strong>
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                      listing.condition === 'Working perfectly' ? 'bg-green-100 text-green-700' :
-                      listing.condition === 'Minor issues' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-gray-100 text-gray-500'
-                    }`}>
-                      {listing.condition}
-                    </span>
-                    <button
-                      onClick={() => deleteListing(listing.id)}
-                      className="text-xs text-red-400 hover:text-red-600 transition">
-                      Delete
-                    </button>
-                  </div>
+                  {!listing.matched && editingId === listing.id ? (
+                    <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                      <select
+                        className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none"
+                        value={editForm.condition}
+                        onChange={e => setEditForm(p => ({ ...p, condition: e.target.value }))}
+                      >
+                        {['Working perfectly', 'Usable', 'Unknown'].map(c => (
+                          <option key={c}>{c}</option>
+                        ))}
+                      </select>
+                      <input type="text" placeholder="Location"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none"
+                        value={editForm.location}
+                        onChange={e => setEditForm(p => ({ ...p, location: e.target.value }))}
+                      />
+                      <input type="number" placeholder="Asking price (LKR)"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none"
+                        value={editForm.asking_price}
+                        onChange={e => setEditForm(p => ({ ...p, asking_price: e.target.value }))}
+                      />
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => setEditingId(null)}
+                          className="flex-1 border border-gray-200 text-gray-500 py-2 rounded-full text-sm">
+                          Cancel
+                        </button>
+                        <button type="button" onClick={() => handleSaveEdit(listing.id, listing.model)}
+                          className="flex-1 bg-gray-900 text-white py-2 rounded-full text-sm font-medium">
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-4 pt-4 border-t border-gray-100 flex gap-2">
+                      {!listing.matched && (
+                        <button type="button"
+                          onClick={() => {
+                            setEditingId(listing.id)
+                            setEditForm({
+                              condition: listing.condition,
+                              location: listing.location ?? '',
+                              asking_price: listing.asking_price?.toString() ?? '',
+                            })
+                          }}
+                          className="flex-1 border border-gray-200 text-gray-500 py-2 rounded-full text-sm hover:border-gray-400 transition">
+                          Edit
+                        </button>
+                      )}
+                      <button type="button" onClick={() => handleDeleteListing(listing.id)}
+                        className="flex-1 border border-red-200 text-red-500 py-2 rounded-full text-sm hover:border-red-400 transition">
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

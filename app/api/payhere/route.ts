@@ -9,7 +9,7 @@ const supabase = createClient(
 
 const PAYHERE_MERCHANT_ID = process.env.PAYHERE_MERCHANT_ID!
 const PAYHERE_MERCHANT_SECRET = process.env.PAYHERE_MERCHANT_SECRET!
-const PAYHERE_BASE = 'https://www.payhere.lk/pay/checkout'
+const PAYHERE_BASE = 'https://sandbox.payhere.lk/pay/checkout'
 
 function generateHash(
   merchantId: string,

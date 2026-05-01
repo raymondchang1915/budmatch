@@ -882,7 +882,7 @@ export default function ListingDetail() {
           </>
         )}
 
-        {currentUser === listing.user_email && match?.negotiation_status !== 'agreed' && !bothPaid && (
+        {currentUser === listing.user_email && !bothPaid && (
           <div className="bg-white border border-amber-200 rounded-2xl p-5 shadow-sm">
             <p className="text-sm font-medium text-gray-900 mb-1">
               Want to switch to {listing.listing_type === 'selling' ? 'buying' : 'selling'}?
