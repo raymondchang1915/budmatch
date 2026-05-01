@@ -141,13 +141,15 @@ export default function Profile() {
   }
 
   async function handleDeleteListing(listingId: string) {
-    if (!confirm('Delete this listing?')) return
+  const confirmed = window.confirm('Delete this listing?')
+  if (!confirmed) return
 
+  try {
     const { data: activeMatches } = await supabase
       .from('matches')
       .select('listing_a, listing_b')
       .or(`listing_a.eq.${listingId},listing_b.eq.${listingId}`)
-      .not('status', 'in', '(cancelled,paid)')
+      .filter('status', 'not.in', '("cancelled","paid")')
 
     for (const m of activeMatches ?? []) {
       const otherListingId = m.listing_a === listingId ? m.listing_b : m.listing_a
@@ -157,8 +159,16 @@ export default function Profile() {
     const { error } = await supabase.from('listings').delete().eq('id', listingId)
     if (error) { alert('Delete failed: ' + error.message); return }
 
+    // Just remove from state directly — no refetch needed
     setListings(prev => prev.filter(l => l.id !== listingId))
+
+  } catch (e) {
+    console.error('Exception during delete:', e)
+    alert('Something went wrong')
   }
+}
+
+ 
 
   async function handleSaveEdit(listingId: string, model: string) {
     await supabase.from('listings').update({
