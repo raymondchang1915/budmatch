@@ -70,6 +70,7 @@ type Shop = {
 export default function AdminPanel() {
   const router = useRouter()
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('overview')
   const [stats, setStats] = useState<Stats | null>(null)
   const [users, setUsers] = useState<User[]>([])
@@ -90,6 +91,7 @@ export default function AdminPanel() {
   async function checkAdmin() {
     const { data } = await supabase.auth.getUser()
     if (!data.user) { router.push('/auth'); return }
+    setCurrentUserEmail(data.user.email!)
     const { data: profile } = await supabase
       .from('user_profiles')
       .select('is_admin')
@@ -205,8 +207,21 @@ export default function AdminPanel() {
 
   async function deleteListing(id: string) {
     if (!confirm('Delete this listing permanently?')) return
-    await supabase.from('listings').delete().eq('id', id)
-    setListings(prev => prev.filter(l => l.id !== id))
+    if (!currentUserEmail) {
+      alert('User not authenticated')
+      return
+    }
+    const res = await fetch('/api/listings', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ listing_id: id, user_email: currentUserEmail }),
+    })
+    const data = await res.json()
+    if (data.ok) {
+      setListings(prev => prev.filter(l => l.id !== id))
+    } else {
+      alert(data.error ?? 'Delete failed')
+    }
   }
 
   if (isAdmin === null) return (

@@ -16,16 +16,29 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    // Verify ownership
+    // Check if user is admin
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('is_admin')
+      .eq('email', user_email)
+      .single()
+
+    const isAdmin = profile?.is_admin ?? false
+
+    // Verify ownership or admin
     const { data: listing } = await supabase
       .from('listings')
       .select('user_email')
       .eq('id', listing_id)
       .single()
 
-    console.log('Listing found:', listing)
+    console.log('Listing found:', listing, 'isAdmin:', isAdmin)
 
-    if (!listing || listing.user_email !== user_email) {
+    if (!listing) {
+      return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
+    }
+
+    if (!isAdmin && listing.user_email !== user_email) {
       console.log('Ownership check failed')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
