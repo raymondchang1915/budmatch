@@ -145,21 +145,19 @@ export default function Profile() {
   if (!confirmed) return
 
   try {
-    const { data: activeMatches } = await supabase
-      .from('matches')
-      .select('listing_a, listing_b')
-      .or(`listing_a.eq.${listingId},listing_b.eq.${listingId}`)
-      .filter('status', 'not.in', '("cancelled","paid")')
-
-    for (const m of activeMatches ?? []) {
-      const otherListingId = m.listing_a === listingId ? m.listing_b : m.listing_a
-      await supabase.from('listings').update({ matched: false }).eq('id', otherListingId)
+    const res = await fetch('/api/listings', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ listing_id: listingId, user_email: user.email }),
+    })
+    const data = await res.json()
+    
+    if (!data.ok) {
+      alert(data.error ?? 'Delete failed')
+      return
     }
 
-    const { error } = await supabase.from('listings').delete().eq('id', listingId)
-    if (error) { alert('Delete failed: ' + error.message); return }
-
-    // Just remove from state directly — no refetch needed
+    // Remove from state
     setListings(prev => prev.filter(l => l.id !== listingId))
 
   } catch (e) {
