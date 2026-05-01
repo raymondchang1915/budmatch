@@ -49,8 +49,8 @@ export default function Profile() {
   const [sentOffers, setSentOffers] = useState<Offer[]>([])
   const [offerLoading, setOfferLoading] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<{ condition: string; location: string; asking_price: string }>({
-    condition: '', location: '', asking_price: '',
+  const [editForm, setEditForm] = useState<{ condition: string; location: string }>({
+    condition: '', location: '',
   })
 
   useEffect(() => {
@@ -305,11 +305,6 @@ export default function Profile() {
                         📍 {listing.location || 'No location'}
                       </p>
                     </div>
-                    {listing.asking_price && (
-                      <span className="bg-gray-900 text-white text-xs px-3 py-1 rounded-full">
-                        LKR {listing.asking_price.toLocaleString()}
-                      </span>
-                    )}
                   </div>
                   <div className="flex gap-2 mb-3">
                     <span className="bg-gray-50 border border-gray-100 rounded-full px-3 py-1 text-xs">
@@ -336,11 +331,6 @@ export default function Profile() {
                         value={editForm.location}
                         onChange={e => setEditForm(p => ({ ...p, location: e.target.value }))}
                       />
-                      <input type="number" placeholder="Asking price (LKR)"
-                        className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
-                        value={editForm.asking_price}
-                        onChange={e => setEditForm(p => ({ ...p, asking_price: e.target.value }))}
-                      />
                       <div className="flex gap-2">
                         <button type="button" onClick={() => setEditingId(null)}
                           className="flex-1 border border-gray-200 text-gray-500 py-2 rounded-full text-sm">
@@ -361,7 +351,6 @@ export default function Profile() {
                             setEditForm({
                               condition: listing.condition,
                               location: listing.location ?? '',
-                              asking_price: listing.asking_price?.toString() ?? '',
                             })
                           }}
                           className="flex-1 border border-gray-200 text-gray-500 py-2 rounded-full text-sm hover:border-gray-400 transition">
