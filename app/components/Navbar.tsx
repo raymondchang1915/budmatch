@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import Logo from './Logo'
 
 type Notification = {
   id: string
@@ -132,13 +133,8 @@ export default function Navbar() {
           boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
         }}>
           {/* Logo */}
-          <Link href="/" style={{
-            fontWeight: 700, fontSize: 16,
-            color: '#111', textDecoration: 'none',
-            letterSpacing: '-0.5px',
-            fontFamily: 'system-ui, sans-serif',
-          }}>
-            BudMatch
+          <Link href="/" style={{ textDecoration: 'none' }}>
+            <Logo size="sm" />
           </Link>
 
           {/* Desktop nav links */}
