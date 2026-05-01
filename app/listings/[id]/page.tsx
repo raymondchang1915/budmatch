@@ -180,46 +180,29 @@ export default function ListingDetail() {
   }, [messages])
 
   async function handleDeleteAndRepost() {
-    if (!listing || !currentUser) return
+  if (!listing || !currentUser) return
 
-    const confirmMsg = listing.matched
-      ? `This will delete your listing and cancel your current match. The other party will be returned to the pool. You'll be redirected to post a new listing. Continue?`
-      : `Delete this listing and post a new one?`
+  const confirmMsg = listing.matched
+    ? `This will delete your listing and cancel your current match. Continue?`
+    : `Delete this listing?`
 
-    if (!confirm(confirmMsg)) return
+  if (!confirm(confirmMsg)) return
 
-    const { data: activeMatches } = await supabase
-      .from('matches')
-      .select('*')
-      .or(`listing_a.eq.${listing.id},listing_b.eq.${listing.id}`)
-      .not('status', 'in', '("cancelled","paid")')
+  const res = await fetch('/api/listings', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ listing_id: listing.id, user_email: currentUser }),
+  })
 
-    for (const m of activeMatches ?? []) {
-      await supabase.from('matches').update({ status: 'cancelled' }).eq('id', m.id)
+  const data = await res.json()
 
-      const otherListingId = m.listing_a === listing.id ? m.listing_b : m.listing_a
-      await supabase.from('listings').update({ matched: false }).eq('id', otherListingId)
-
-      const { data: otherListing } = await supabase
-        .from('listings').select('user_email, model, id').eq('id', otherListingId).single()
-
-      if (otherListing) {
-        await supabase.from('notifications').insert([{
-          user_email: otherListing.user_email,
-          type: 'match_cancelled',
-          message: `Your match for ${otherListing.model} was cancelled by the other party. You've been put back in the matching pool.`,
-          listing_id: otherListing.id,
-          match_id: m.id,
-          read: false,
-        }])
-      }
-    }
-
-    await supabase.from('offers').delete().eq('listing_id', listing.id)
-    await supabase.from('listings').delete().eq('id', listing.id)
-
-    router.push('/listings/new')
+  if (!data.ok) {
+    alert(data.error ?? 'Delete failed')
+    return
   }
+
+  router.push('/profile') // or wherever you want
+}
 
   async function loadData() {
     const { data: listingData } = await supabase.from('listings').select('*').eq('id', id).single()
