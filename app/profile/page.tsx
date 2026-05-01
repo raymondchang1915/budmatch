@@ -143,30 +143,34 @@ export default function Profile() {
   async function handleDeleteListing(listingId: string) {
     if (!confirm('Delete this listing?')) return
 
-    const { data: activeMatches } = await supabase
+    const { data: allMatches } = await supabase
       .from('matches')
       .select('*')
       .or(`listing_a.eq.${listingId},listing_b.eq.${listingId}`)
-      .not('status', 'in', '(cancelled,paid)')
 
-    for (const m of activeMatches ?? []) {
-      await supabase.from('matches').update({ status: 'cancelled' }).eq('id', m.id)
-      const otherListingId = m.listing_a === listingId ? m.listing_b : m.listing_a
-      await supabase.from('listings').update({ matched: false }).eq('id', otherListingId)
-      const { data: otherListing } = await supabase
-        .from('listings').select('user_email, model, id').eq('id', otherListingId).single()
-      if (otherListing) {
-        await supabase.from('notifications').insert([{
-          user_email: otherListing.user_email,
-          type: 'match_cancelled',
-          message: `Your match for ${otherListing.model} was cancelled. You've been put back in the pool.`,
-          listing_id: otherListing.id,
-          match_id: m.id,
-          read: false,
-        }])
+    for (const m of allMatches ?? []) {
+      if (m.status !== 'cancelled' && m.status !== 'paid') {
+        const otherListingId = m.listing_a === listingId ? m.listing_b : m.listing_a
+        await supabase.from('listings').update({ matched: false }).eq('id', otherListingId)
+        const { data: otherListing } = await supabase
+          .from('listings').select('user_email, model, id').eq('id', otherListingId).single()
+        if (otherListing) {
+          await supabase.from('notifications').insert([{
+            user_email: otherListing.user_email,
+            type: 'match_cancelled',
+            message: `Your match for ${otherListing.model} was cancelled. You've been put back in the pool.`,
+            listing_id: otherListing.id,
+            match_id: null,
+            read: false,
+          }])
+        }
       }
+      await supabase.from('messages').delete().eq('match_id', m.id)
+      await supabase.from('notifications').delete().eq('match_id', m.id)
+      await supabase.from('matches').delete().eq('id', m.id)
     }
 
+    await supabase.from('notifications').delete().eq('listing_id', listingId)
     await supabase.from('offers').delete().eq('listing_id', listingId)
     await supabase.from('listings').delete().eq('id', listingId)
     setListings(prev => prev.filter(l => l.id !== listingId))
@@ -325,7 +329,7 @@ export default function Profile() {
                   {!listing.matched && editingId === listing.id ? (
                     <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
                       <select
-                        className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm text-gray-900 focus:outline-none"
                         value={editForm.condition}
                         onChange={e => setEditForm(p => ({ ...p, condition: e.target.value }))}
                       >
@@ -334,12 +338,12 @@ export default function Profile() {
                         ))}
                       </select>
                       <input type="text" placeholder="Location"
-                        className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
                         value={editForm.location}
                         onChange={e => setEditForm(p => ({ ...p, location: e.target.value }))}
                       />
                       <input type="number" placeholder="Asking price (LKR)"
-                        className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
                         value={editForm.asking_price}
                         onChange={e => setEditForm(p => ({ ...p, asking_price: e.target.value }))}
                       />
