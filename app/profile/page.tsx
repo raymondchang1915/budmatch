@@ -152,6 +152,8 @@ export default function Profile() {
     })
     const data = await res.json()
     
+    console.log('Delete response:', data)
+
     if (!data.ok) {
       alert(data.error ?? 'Delete failed')
       return

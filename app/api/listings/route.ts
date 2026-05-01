@@ -9,6 +9,8 @@ const supabase = createClient(
 export async function DELETE(req: NextRequest) {
   const { listing_id, user_email } = await req.json()
 
+  console.log('DELETE request received:', { listing_id, user_email })
+
   if (!listing_id || !user_email) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   }
@@ -21,7 +23,10 @@ export async function DELETE(req: NextRequest) {
       .eq('id', listing_id)
       .single()
 
+    console.log('Listing found:', listing)
+
     if (!listing || listing.user_email !== user_email) {
+      console.log('Ownership check failed')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -32,6 +37,8 @@ export async function DELETE(req: NextRequest) {
       .or(`listing_a.eq.${listing_id},listing_b.eq.${listing_id}`)
       .in('status', ['pending', 'negotiating'])
 
+    console.log('Active matches:', activeMatches)
+
     // Update matched status for other listings
     for (const match of activeMatches ?? []) {
       const otherListingId = match.listing_a === listing_id ? match.listing_b : match.listing_a
@@ -39,10 +46,13 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Delete the listing
-    const { error } = await supabase
+    const { error, data: deletedData } = await supabase
       .from('listings')
       .delete()
       .eq('id', listing_id)
+      .select()
+
+    console.log('Delete response - error:', error, 'data:', deletedData)
 
     if (error) {
       console.error('Delete error:', error)
