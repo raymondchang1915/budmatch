@@ -15,6 +15,7 @@ type Listing = {
   asking_price: number | null
   matched: boolean
   created_at: string
+  image_urls: string[] | null
 }
 
 export default function Browse() {
@@ -261,6 +262,14 @@ export default function Browse() {
                   el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.03)'
                 }}
               >
+                {listing.image_urls && listing.image_urls.length > 0 && (
+                  <img
+                    src={listing.image_urls[0]}
+                    alt={listing.model}
+                    className="w-full h-36 object-cover rounded-xl mb-3"
+                  />
+                )}
+
                 {/* Top row */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                   <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>

@@ -202,6 +202,8 @@ export default function NewListing() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const [images, setImages] = useState<File[]>([])
+  const [uploading, setUploading] = useState(false)
   const [marketPrice, setMarketPrice] = useState<number | null>(null)
   const [customModel, setCustomModel] = useState('')
 
@@ -219,6 +221,22 @@ export default function NewListing() {
     setForm({ ...form, model })
     setCustomModel('')
     setMarketPrice(model === 'Other' ? null : (DEFAULT_MARKET_PRICES[model] ?? 10000))
+  }
+
+  async function uploadImages(listingId: string) {
+    const urls: string[] = []
+    for (const file of images) {
+      const ext = file.name.split('.').pop()
+      const path = `${listingId}/${Date.now()}.${ext}`
+      const { error } = await supabase.storage
+        .from('listing-images')
+        .upload(path, file, { upsert: true })
+      if (!error) {
+        const { data } = supabase.storage.from('listing-images').getPublicUrl(path)
+        urls.push(data.publicUrl)
+      }
+    }
+    return urls
   }
 
   const handleSubmit = async () => {
@@ -239,7 +257,7 @@ export default function NewListing() {
 
     const resolvedModel = form.model === 'Other' ? `Custom: ${customModel.trim()}` : form.model
 
-    const { error: insertError } = await supabase
+    const { data: listing, error: insertError } = await supabase
       .from('listings')
       .insert([{
         user_email: form.user_email,
@@ -260,6 +278,13 @@ export default function NewListing() {
       setError(insertError.message)
       setLoading(false)
       return
+    }
+
+    if (images.length > 0 && listing) {
+      setUploading(true)
+      const urls = await uploadImages(listing.id)
+      await supabase.from('listings').update({ image_urls: urls }).eq('id', listing.id)
+      setUploading(false)
     }
 
     // update demand stats
@@ -476,6 +501,55 @@ export default function NewListing() {
               className={inputClass}
               value={form.shop_code}
               onChange={e => setForm({ ...form, shop_code: e.target.value.toUpperCase() })} />
+          </div>
+
+          {/* Photos */}
+          <div>
+            <label className={labelClass}>Photos (optional)</label>
+            <div
+              className="w-full bg-white border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center cursor-pointer hover:border-gray-400 transition"
+              onClick={() => document.getElementById('image-upload')?.click()}
+            >
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={e => {
+                  const files = Array.from(e.target.files ?? []).slice(0, 5)
+                  setImages(files)
+                }}
+              />
+              {images.length === 0 ? (
+                <p className="text-sm text-gray-400">Tap to add photos · Max 5</p>
+              ) : (
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {images.map((f, i) => (
+                    <div key={i} className="relative">
+                      <img
+                        src={URL.createObjectURL(f)}
+                        className="w-20 h-20 object-cover rounded-xl"
+                        alt=""
+                      />
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation()
+                          setImages(prev => prev.filter((_, j) => j !== i))
+                        }}
+                        className="absolute -top-1 -right-1 w-5 h-5 bg-gray-900 text-white rounded-full text-xs flex items-center justify-center"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <div className="w-20 h-20 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center text-gray-400 text-xl">
+                    +
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {error && <p className="text-red-500 text-sm ml-1">{error}</p>}

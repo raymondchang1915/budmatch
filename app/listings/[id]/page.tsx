@@ -20,6 +20,7 @@ type Listing = {
   matched: boolean
   created_at: string
   shop_code: string | null
+  image_urls: string[] | null
 }
 
 type Match = {
@@ -490,6 +491,20 @@ export default function ListingDetail() {
               </span>
             </div>
           </div>
+          {listing.image_urls && listing.image_urls.length > 0 && (
+            <div className="flex gap-2 flex-wrap mb-4">
+              {listing.image_urls.map((url, i) => (
+                <img
+                  key={i}
+                  src={url}
+                  alt={`${listing.model} ${i + 1}`}
+                  className="w-24 h-24 object-cover rounded-xl cursor-pointer hover:opacity-90 transition"
+                  onClick={() => window.open(url, '_blank')}
+                />
+              ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-gray-400 text-xs mb-1">Has</p>
