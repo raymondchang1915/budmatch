@@ -22,26 +22,33 @@ const EARBUD_MODELS = [
   'Nothing Ear', 'Nothing Ear (2)', 'Nothing Ear (a)',
   'CMF Buds Pro 2', 'CMF Buds Pro', 'CMF Buds 2', 'CMF Buds',
   // Soundcore (Anker)
+  'Soundcore Liberty 5', 'Soundcore Liberty 5 NC',
   'Soundcore Liberty 4 Pro', 'Soundcore Liberty 4 NC', 'Soundcore Liberty 4',
-  'Soundcore Liberty 3 Pro', 'Soundcore Space A40',
-  'Soundcore Life P3', 'Soundcore Life P2',
-  'Soundcore P40i', 'Soundcore P30i', 'Soundcore A30i',
+  'Soundcore Liberty 3 Pro', 'Soundcore K20i', 'Soundcore Space A40',
+  'Soundcore P40i', 'Soundcore P30i', 'Soundcore Sport X20', 'Soundcore Sport X10', 'Soundcore A30i',
+  'Soundcore Life P3', 'Soundcore Life P2', 'Soundcore Life Note 3S', 'Soundcore Life Note 3',
+  'Soundcore Life P2 Mini', 'Soundcore Life Dot 2', 'Soundcore Dot 2i', 'Soundcore R50i',
   // Realme
+  'Realme Buds Air 6 Pro', 'Realme Buds Air 6',
   'Realme Buds Air 5 Pro', 'Realme Buds Air 5', 'Realme Buds Air 3',
-  'Realme Buds T300', 'Realme Buds T100',
+  'Realme Buds T310', 'Realme Buds T300', 'Realme Buds T200', 'Realme Buds T100', 'Realme Buds T100 Neo',
+  'Realme Buds Wireless 2 Neo',
   // OnePlus
-  'OnePlus Buds Pro 2', 'OnePlus Buds Pro', 'OnePlus Buds Z2',
+  'OnePlus Buds Pro 2', 'OnePlus Buds 4', 'OnePlus Buds 3', 'OnePlus Buds Pro',
+  'OnePlus Nord Buds 2', 'OnePlus Buds Z2', 'OnePlus Nord Buds CE',
   // Xiaomi / Redmi
-  'Xiaomi Redmi Buds 6 Pro', 'Xiaomi Redmi Buds 6',
-  'Xiaomi Redmi Buds 5 Pro', 'Xiaomi Redmi Buds 5',
-  'Xiaomi Redmi Buds 4 Pro', 'Xiaomi Buds 4',
+  'Xiaomi Redmi Buds 6 Pro', 'Xiaomi Redmi Buds 6', 'Xiaomi Redmi Buds 6 Active',
+  'Xiaomi Redmi Buds 5 Pro', 'Xiaomi Redmi Buds 5', 'Xiaomi Redmi Buds 5A',
+  'Xiaomi Redmi Buds 4 Pro', 'Xiaomi Redmi Buds 4', 'Xiaomi Redmi Buds 4 Lite', 'Xiaomi Buds 4',
+  'Xiaomi Redmi Buds 3', 'Xiaomi Redmi Buds 3 Lite', 'Xiaomi Redmi Buds Essential',
   // Oppo
   'Oppo Enco X2', 'Oppo Enco Air 3 Pro', 'Oppo Enco Air 3', 'Oppo Enco Buds 2',
   // Huawei
   'Huawei FreeBuds Pro 3', 'Huawei FreeBuds Pro 2',
   'Huawei FreeBuds 5i', 'Huawei FreeBuds 4i',
   // Haylou
-  'Haylou X1 Pro', 'Haylou X1 2023', 'Haylou GT7',
+  'Haylou X1 Pro', 'Haylou W1 ANC', 'Haylou MoriPods ANC', 'Haylou MoriPods',
+  'Haylou X1 2023', 'Haylou X1 Neo', 'Haylou GT7', 'Haylou GT5', 'Haylou X1C',
   // Jabra
   'Jabra Elite 10', 'Jabra Elite 8 Active', 'Jabra Elite 4',
   // Bose
@@ -55,91 +62,125 @@ const CONDITIONS = ['Working perfectly', 'Usable', 'Unknown']
 
 const DEFAULT_MARKET_PRICES: Record<string, number> = {
   // Apple — iSpot LK / authorized dealers
-  'Apple AirPods Pro 2':        69000,
-  'Apple AirPods Pro 1':        45000,
-  'Apple AirPods 4 ANC':        62000,
-  'Apple AirPods 4':            52000,
-  'Apple AirPods 3':            42000,
-  'Apple AirPods 2':            28000,
+  'Apple AirPods Pro 2':              69000,
+  'Apple AirPods Pro 1':              45000,
+  'Apple AirPods 4 ANC':              62000,
+  'Apple AirPods 4':                  52000,
+  'Apple AirPods 3':                  42000,
+  'Apple AirPods 2':                  28000,
   // Samsung — DirectDealz / Celltronics
-  'Samsung Galaxy Buds3 Pro':   42000,
-  'Samsung Galaxy Buds3':       30000,
-  'Samsung Galaxy Buds2 Pro':   28000,
-  'Samsung Galaxy Buds2':       23000,
-  'Samsung Galaxy Buds FE':     18000,
-  'Samsung Galaxy Buds Live':   16000,
-  'Samsung Galaxy Buds Plus':   14000,
-  // Sony — DirectDealz LKR 59,800 / GQ LKR 55,900–59,900
-  'Sony WF-1000XM5':            60000,
-  'Sony WF-1000XM4':            42000,
-  'Sony WF-C700N':              24000,
-  'Sony WF-C500':               16000,
+  'Samsung Galaxy Buds3 Pro':         42000,
+  'Samsung Galaxy Buds3':             30000,
+  'Samsung Galaxy Buds2 Pro':         28000,
+  'Samsung Galaxy Buds2':             23000,
+  'Samsung Galaxy Buds FE':           18000,
+  'Samsung Galaxy Buds Live':         16000,
+  'Samsung Galaxy Buds Plus':         14000,
+  // Sony — DirectDealz / GQ
+  'Sony WF-1000XM5':                  60000,
+  'Sony WF-1000XM4':                  42000,
+  'Sony WF-C700N':                    24000,
+  'Sony WF-C500':                     16000,
   // JBL — Celltronics / Greenware
-  'JBL Tour Pro 2':             40000,
-  'JBL Live Pro 2':             30000,
-  'JBL Tune Flex':              16000,
-  'JBL Tune 230NC':             12000,
-  'JBL Wave Flex':              10000,
-  // Nothing / CMF — DirectDealz / NoFake Maharagama
-  'Nothing Ear':                38000,
-  'Nothing Ear (2)':            35000,
-  'Nothing Ear (a)':            22000,
-  'CMF Buds Pro 2':             16000,
-  'CMF Buds Pro':               14000,
-  'CMF Buds 2':                  9000,
-  'CMF Buds':                    7500,
-  // Soundcore — Celltronics authorized
-  'Soundcore Liberty 4 Pro':    28000,
-  'Soundcore Liberty 4 NC':     17000,
-  'Soundcore Liberty 4':        20000,
-  'Soundcore Liberty 3 Pro':    24000,
-  'Soundcore Space A40':        14000,
-  'Soundcore Life P3':          10500,
-  'Soundcore Life P2':           8500,
-  'Soundcore P40i':             15000,
-  'Soundcore P30i':             12000,
-  'Soundcore A30i':              9500,
-  // Realme — DirectDealz
-  'Realme Buds Air 5 Pro':      16000,
-  'Realme Buds Air 5':          12000,
-  'Realme Buds Air 3':           9000,
-  'Realme Buds T300':            7000,
-  'Realme Buds T100':            4500,
-  // OnePlus — DirectDealz / XMobile
-  'OnePlus Buds Pro 2':         25000,
-  'OnePlus Buds Pro':           18000,
-  'OnePlus Buds Z2':            10000,
-  // Xiaomi / Redmi — DirectDealz
-  'Xiaomi Redmi Buds 6 Pro':    18000,
-  'Xiaomi Redmi Buds 6':        12000,
-  'Xiaomi Redmi Buds 5 Pro':    14000,
-  'Xiaomi Redmi Buds 5':        10000,
-  'Xiaomi Redmi Buds 4 Pro':    12000,
-  'Xiaomi Buds 4':              16000,
+  'JBL Tour Pro 2':                   40000,
+  'JBL Live Pro 2':                   30000,
+  'JBL Tune Flex':                    16000,
+  'JBL Tune 230NC':                   12000,
+  'JBL Wave Flex':                    10000,
+  // Nothing / CMF — DirectDealz / NoFake
+  'Nothing Ear':                      38000,
+  'Nothing Ear (2)':                  35000,
+  'Nothing Ear (a)':                  22000,
+  'CMF Buds Pro 2':                   16000,
+  'CMF Buds Pro':                     14000,
+  'CMF Buds 2':                        9000,
+  'CMF Buds':                          7500,
+  // Soundcore — Celltronics / DirectDealz / CyberDeals
+  'Soundcore Liberty 5':              29000,
+  'Soundcore Liberty 5 NC':           22000,
+  'Soundcore Liberty 4 Pro':          26000,
+  'Soundcore Liberty 4 NC':           17000,
+  'Soundcore Liberty 4':              20000,
+  'Soundcore Liberty 3 Pro':          24000,
+  'Soundcore K20i':                   30000,
+  'Soundcore Space A40':              14000,
+  'Soundcore P40i':                   15000,
+  'Soundcore P30i':                   12000,
+  'Soundcore Sport X20':              10000,
+  'Soundcore Sport X10':               9000,
+  'Soundcore A30i':                    9500,
+  'Soundcore Life P3':                10500,
+  'Soundcore Life P2':                 8500,
+  'Soundcore Life Note 3S':            8500,
+  'Soundcore Life Note 3':             7500,
+  'Soundcore Life P2 Mini':            6500,
+  'Soundcore Life Dot 2':              6000,
+  'Soundcore Dot 2i':                  5500,
+  'Soundcore R50i':                    8000,
+  // Realme — DirectDealz / CyberDeals
+  'Realme Buds Air 6 Pro':            16000,
+  'Realme Buds Air 6':                12000,
+  'Realme Buds Air 5 Pro':            16000,
+  'Realme Buds Air 5':                12000,
+  'Realme Buds Air 3':                 9000,
+  'Realme Buds T310':                 14000,
+  'Realme Buds T300':                  7000,
+  'Realme Buds T200':                  9000,
+  'Realme Buds T100':                  4500,
+  'Realme Buds T100 Neo':              4800,
+  'Realme Buds Wireless 2 Neo':        4200,
+  // OnePlus — DirectDealz / XMobile / NoFake
+  'OnePlus Buds Pro 2':               25000,
+  'OnePlus Buds 4':                   19000,
+  'OnePlus Buds 3':                   24000,
+  'OnePlus Buds Pro':                 18000,
+  'OnePlus Nord Buds 2':              14800,
+  'OnePlus Buds Z2':                  10000,
+  'OnePlus Nord Buds CE':              9500,
+  // Xiaomi / Redmi — DirectDealz / Celltronics
+  'Xiaomi Redmi Buds 6 Pro':          18000,
+  'Xiaomi Redmi Buds 6':              12000,
+  'Xiaomi Redmi Buds 6 Active':        8000,
+  'Xiaomi Redmi Buds 5 Pro':          14000,
+  'Xiaomi Redmi Buds 5':              10000,
+  'Xiaomi Redmi Buds 5A':              8000,
+  'Xiaomi Redmi Buds 4 Pro':          12000,
+  'Xiaomi Redmi Buds 4':              10500,
+  'Xiaomi Redmi Buds 4 Lite':          4800,
+  'Xiaomi Buds 4':                    16000,
+  'Xiaomi Redmi Buds 3':               6800,
+  'Xiaomi Redmi Buds 3 Lite':          5200,
+  'Xiaomi Redmi Buds Essential':       5200,
   // Oppo — DirectDealz
-  'Oppo Enco X2':               28000,
-  'Oppo Enco Air 3 Pro':        16000,
-  'Oppo Enco Air 3':            10000,
-  'Oppo Enco Buds 2':            7000,
+  'Oppo Enco X2':                     28000,
+  'Oppo Enco Air 3 Pro':              16000,
+  'Oppo Enco Air 3':                  10000,
+  'Oppo Enco Buds 2':                  7000,
   // Huawei — authorized dealers
-  'Huawei FreeBuds Pro 3':      42000,
-  'Huawei FreeBuds Pro 2':      32000,
-  'Huawei FreeBuds 5i':         18000,
-  'Huawei FreeBuds 4i':         15000,
-  // Haylou — DirectDealz / NoFake
-  'Haylou X1 Pro':              11000,
-  'Haylou X1 2023':              7500,
-  'Haylou GT7':                  5500,
+  'Huawei FreeBuds Pro 3':            42000,
+  'Huawei FreeBuds Pro 2':            32000,
+  'Huawei FreeBuds 5i':               18000,
+  'Huawei FreeBuds 4i':               15000,
+  // Haylou — DirectDealz / NoFake Maharagama
+  'Haylou X1 Pro':                    11000,
+  'Haylou W1 ANC':                    11800,
+  'Haylou MoriPods ANC':              12000,
+  'Haylou MoriPods':                   8500,
+  'Haylou X1 2023':                    7500,
+  'Haylou X1 Neo':                     5800,
+  'Haylou GT7':                        5500,
+  'Haylou GT5':                        5800,
+  'Haylou X1C':                        4800,
   // Jabra — Greenware / authorized
-  'Jabra Elite 10':             50000,
-  'Jabra Elite 8 Active':       35000,
-  'Jabra Elite 4':              20000,
-  // Bose — Greenware LKR 67,500
-  'Bose QuietComfort Earbuds 2': 68000,
-  'Bose QuietComfort Earbuds':   50000,
-  'Bose Ultra Open Earbuds':     60000,
+  'Jabra Elite 10':                   50000,
+  'Jabra Elite 8 Active':             35000,
+  'Jabra Elite 4':                    20000,
+  // Bose — Greenware
+  'Bose QuietComfort Earbuds 2':      68000,
+  'Bose QuietComfort Earbuds':        50000,
+  'Bose Ultra Open Earbuds':          60000,
   // Other
-  'Other': 10000,
+  'Other':                            10000,
 }
 
 export default function NewListing() {
@@ -159,6 +200,7 @@ export default function NewListing() {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
   const [marketPrice, setMarketPrice] = useState<number | null>(null)
+  const [customModel, setCustomModel] = useState('')
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -172,12 +214,17 @@ export default function NewListing() {
 
   const handleModelChange = (model: string) => {
     setForm({ ...form, model })
-    setMarketPrice(DEFAULT_MARKET_PRICES[model] ?? 10000)
+    setCustomModel('')
+    setMarketPrice(model === 'Other' ? null : (DEFAULT_MARKET_PRICES[model] ?? 10000))
   }
 
   const handleSubmit = async () => {
     if (!form.model || !form.has_component || !form.condition || !form.listing_type || !form.user_email) {
       setError('Please fill in all required fields')
+      return
+    }
+    if (form.model === 'Other' && !customModel.trim()) {
+      setError('Please enter your earbud model name')
       return
     }
     if (!form.year_of_purchase) {
@@ -187,11 +234,13 @@ export default function NewListing() {
     setLoading(true)
     setError('')
 
+    const resolvedModel = form.model === 'Other' ? `Custom: ${customModel.trim()}` : form.model
+
     const { data: listing, error: insertError } = await supabase
       .from('listings')
       .insert([{
         user_email: form.user_email,
-        model: form.model,
+        model: resolvedModel,
         has_component: form.has_component,
         has_case: form.has_case,
         needs_component: form.has_component === 'Left bud' ? 'Right bud' : 'Left bud',
@@ -221,7 +270,7 @@ export default function NewListing() {
     await fetch('/api/match', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: form.model }),
+      body: JSON.stringify({ model: resolvedModel }),
     })
 
     setSuccess(true)
@@ -307,12 +356,31 @@ export default function NewListing() {
 
           {/* Model */}
           <div>
-            <label className={labelClass}>Earbud model *</label>
+            <label className={labelClass}>
+              Earbud model *
+              <a href="/models" target="_blank" className="ml-2 text-xs text-gray-400 hover:text-gray-600 font-normal underline underline-offset-2">
+                View all models & prices
+              </a>
+            </label>
             <select className={selectClass} value={form.model}
               onChange={e => handleModelChange(e.target.value)}>
               <option value="">Select model</option>
               {EARBUD_MODELS.map(m => <option key={m}>{m}</option>)}
             </select>
+            {form.model === 'Other' && (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  placeholder="Enter your earbud model name"
+                  className={inputClass}
+                  value={customModel}
+                  onChange={e => setCustomModel(e.target.value)}
+                />
+                <p className="text-xs text-amber-600 mt-1 ml-1">
+                  Your model will be reviewed by our team. Matching may take longer.
+                </p>
+              </div>
+            )}
             {marketPrice && (
               <p className="text-xs text-gray-400 mt-1 ml-1">
                 Market price: LKR {marketPrice.toLocaleString()}
@@ -410,7 +478,7 @@ export default function NewListing() {
           {error && <p className="text-red-500 text-sm ml-1">{error}</p>}
 
           <button onClick={handleSubmit}
-            disabled={loading || !form.model || !form.has_component || !form.condition || !form.listing_type || !form.year_of_purchase}
+            disabled={loading || !form.model || !form.has_component || !form.condition || !form.listing_type || !form.year_of_purchase || (form.model === 'Other' && !customModel.trim())}
             className="bg-gray-900 text-white py-3.5 rounded-full font-medium hover:bg-black transition disabled:opacity-40 text-sm">
             {loading ? 'Posting...' : 'Post listing →'}
           </button>
