@@ -433,6 +433,8 @@ export default function Home() {
         <a href="/terms" className="hover:text-gray-700 transition">Terms &amp; Conditions</a>
         <span>·</span>
         <a href="/refund" className="hover:text-gray-700 transition">Refund Policy</a>
+        <span>·</span>
+        <a href="/help" className="hover:text-gray-700 transition">Help</a>
       </footer>
 
     </main>
