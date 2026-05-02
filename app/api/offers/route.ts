@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
     await sendEmail(listing.user_email, `New offer on your ${listing.model}`, `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f5f5f0">
         <div style="background:#fff;border-radius:20px;padding:32px;border:1px solid #e8e8e8">
+          <div style="text-align:center;margin-bottom:24px"><img src="https://budmatch.site/icon.svg" alt="BudMatch" style="height:40px;width:auto" /></div>
           <h2 style="color:#111;font-size:22px;margin:0 0 8px;font-weight:600">New offer received 💰</h2>
           <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 16px">
             Someone made an offer of <strong>LKR ${Number(amount).toLocaleString()}</strong> on your <strong>${listing.model}</strong> listing.
@@ -165,6 +166,7 @@ export async function POST(req: NextRequest) {
     const emailHtml = (isbuyer: boolean) => `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f5f5f0">
         <div style="background:#fff;border-radius:20px;padding:32px;border:1px solid #e8e8e8">
+          <div style="text-align:center;margin-bottom:24px"><img src="https://budmatch.site/icon.svg" alt="BudMatch" style="height:40px;width:auto" /></div>
           <h2 style="color:#111;font-size:22px;margin:0 0 8px;font-weight:600">Offer accepted! 🎉</h2>
           <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 16px">
             ${isbuyer ? 'Your offer was accepted' : 'You accepted the offer'} for <strong>${listing.model}</strong> at <strong>LKR ${agreedPrice.toLocaleString()}</strong>.

@@ -63,6 +63,7 @@ async function notifyPartnerPaid(matchId: string, paidRole: 'buyer' | 'seller') 
   await sendEmail(notifyEmail, `Action needed — ${model}`, `
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f5f5f0">
       <div style="background:#fff;border-radius:20px;padding:32px;border:1px solid #e8e8e8">
+        <div style="text-align:center;margin-bottom:24px"><img src="https://budmatch.site/icon.svg" alt="BudMatch" style="height:40px;width:auto" /></div>
         <h2 style="color:#111;font-size:22px;margin:0 0 8px">${paidLabel} paid ✓</h2>
         <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 24px">
           Your match paid their fee for <strong>${model}</strong>.
@@ -105,6 +106,7 @@ async function notifyChatUnlocked(matchId: string) {
   const html = `
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f5f5f0">
       <div style="background:#fff;border-radius:20px;padding:32px;border:1px solid #e8e8e8">
+        <div style="text-align:center;margin-bottom:24px"><img src="https://budmatch.site/icon.svg" alt="BudMatch" style="height:40px;width:auto" /></div>
         <h2 style="color:#111;font-size:22px;margin:0 0 8px">Chat is open 🤝</h2>
         <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 24px">
           Both sides paid for the <strong>${model}</strong>. Open chat to arrange the exchange.

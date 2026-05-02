@@ -86,10 +86,15 @@ export async function DELETE(req: NextRequest) {
         await sendEmail(
           otherListing.user_email,
           `Match cancelled — ${listing.model}`,
-          `<p>Hi,</p>
-          <p>${msg}</p>
-          <p>Head to your <a href="https://budmatch.com/profile">profile</a> to check your listing status.</p>
-          <p>— The BudMatch team</p>`
+          `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f5f5f0">
+            <div style="background:#fff;border-radius:20px;padding:32px;border:1px solid #e8e8e8">
+              <div style="text-align:center;margin-bottom:24px"><img src="https://budmatch.site/icon.svg" alt="BudMatch" style="height:40px;width:auto" /></div>
+              <h2 style="color:#111;font-size:22px;margin:0 0 8px">Match cancelled ❌</h2>
+              <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 24px">${msg}</p>
+              <a href="https://budmatch.site/profile" style="display:inline-block;background:#111;color:#fff;padding:12px 28px;border-radius:999px;text-decoration:none;font-size:13px">Check your listing →</a>
+              <p style="color:#bbb;font-size:11px;margin-top:28px">BudMatch · Sri Lanka</p>
+            </div>
+          </div>`
         )
       }
     }
