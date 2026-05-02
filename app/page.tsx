@@ -408,7 +408,7 @@ export default function Home() {
         }}>
           <div>
             <p className="font-display" style={{ fontSize: 18, color: '#fff', marginBottom: 4 }}>
-              Apple · Samsung · Sony · JBL · Bose · Jabra · and 40+ more
+              Samsung · Sony · JBL · Bose · Jabra · and 80+ more
             </p>
             <p className="font-body" style={{ fontSize: 12, color: '#666' }}>
               All major earbud models supported
