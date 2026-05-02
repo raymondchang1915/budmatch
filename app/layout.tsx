@@ -9,6 +9,19 @@ export const metadata: Metadata = {
     icon: '/icon.svg',
     apple: '/icon.svg',
   },
+  openGraph: {
+    title: 'BudMatch — Match your missing earbud',
+    description: 'Find someone who has what you need and needs what you have.',
+    url: 'https://budmatch.site',
+    siteName: 'BudMatch',
+    images: [
+      {
+        url: 'https://budmatch.site/og-image.png',
+        width: 1200,
+        height: 630,
+      },
+    ],
+  },
 }
 
 export const viewport: Viewport = {
