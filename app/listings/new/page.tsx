@@ -31,6 +31,7 @@ const EARBUD_MODELS = [
   // Realme
   'Realme Buds Air 6 Pro', 'Realme Buds Air 6',
   'Realme Buds Air 5 Pro', 'Realme Buds Air 5', 'Realme Buds Air 3',
+  'Realme Buds Air 6i',
   'Realme Buds T310', 'Realme Buds T300', 'Realme Buds T200', 'Realme Buds T100', 'Realme Buds T100 Neo',
   'Realme Buds Wireless 2 Neo',
   // OnePlus
@@ -39,7 +40,7 @@ const EARBUD_MODELS = [
   // Xiaomi / Redmi
   'Xiaomi Redmi Buds 6 Pro', 'Xiaomi Redmi Buds 6', 'Xiaomi Redmi Buds 6 Active',
   'Xiaomi Redmi Buds 5 Pro', 'Xiaomi Redmi Buds 5', 'Xiaomi Redmi Buds 5A',
-  'Xiaomi Redmi Buds 4 Pro', 'Xiaomi Redmi Buds 4', 'Xiaomi Redmi Buds 4 Lite', 'Xiaomi Buds 4',
+  'Xiaomi Redmi Buds 4 Pro', 'Xiaomi Redmi Buds 4', 'Xiaomi Redmi Buds 4 Active', 'Xiaomi Redmi Buds 4 Lite', 'Xiaomi Buds 4',
   'Xiaomi Redmi Buds 3', 'Xiaomi Redmi Buds 3 Lite', 'Xiaomi Redmi Buds Essential',
   // Oppo
   'Oppo Enco X2', 'Oppo Enco Air 3 Pro', 'Oppo Enco Air 3', 'Oppo Enco Buds 2',
@@ -120,6 +121,7 @@ const DEFAULT_MARKET_PRICES: Record<string, number> = {
   // Realme — DirectDealz / CyberDeals
   'Realme Buds Air 6 Pro':            16000,
   'Realme Buds Air 6':                12000,
+  'Realme Buds Air 6i':                9500,
   'Realme Buds Air 5 Pro':            16000,
   'Realme Buds Air 5':                12000,
   'Realme Buds Air 3':                 9000,
@@ -146,6 +148,7 @@ const DEFAULT_MARKET_PRICES: Record<string, number> = {
   'Xiaomi Redmi Buds 5A':              8000,
   'Xiaomi Redmi Buds 4 Pro':          12000,
   'Xiaomi Redmi Buds 4':              10500,
+  'Xiaomi Redmi Buds 4 Active':        6500,
   'Xiaomi Redmi Buds 4 Lite':          4800,
   'Xiaomi Buds 4':                    16000,
   'Xiaomi Redmi Buds 3':               6800,
@@ -236,7 +239,7 @@ export default function NewListing() {
 
     const resolvedModel = form.model === 'Other' ? `Custom: ${customModel.trim()}` : form.model
 
-    const { data: listing, error: insertError } = await supabase
+    const { error: insertError } = await supabase
       .from('listings')
       .insert([{
         user_email: form.user_email,

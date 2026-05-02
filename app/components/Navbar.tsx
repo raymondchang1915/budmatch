@@ -142,6 +142,7 @@ export default function Navbar() {
             {[
               { href: '/browse', label: 'Browse' },
               { href: '/listings/new', label: 'Add a bud' },
+              { href: '/models', label: 'Models' },
               { href: '/shop', label: 'For shops' },
             ].map(link => (
               <Link key={link.href} href={link.href} style={{

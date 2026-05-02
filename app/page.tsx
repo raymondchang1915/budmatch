@@ -327,7 +327,7 @@ export default function Home() {
           border: '1px solid #e0e0e0',
         }}>
           {[
-            { val: '50+', label: 'Earbud models' },
+            { val: '100+', label: 'Earbud models' },
             { val: 'LKR', label: 'Sri Lankan Rupees' },
             { val: '2×', label: 'Cheaper than new' },
           ].map((s, i) => (
