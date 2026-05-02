@@ -30,7 +30,7 @@ serve(async (req: Request) => {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: 'BudMatch <hello@budmatch.site>', to, subject, html }),
+      body: JSON.stringify({ from: 'BudMatch <noreply@budmatch.site>', reply_to: 'hello@budmatch.site', to, subject, html }),
     })
     const data = await res.json()
     console.log('Auth email response:', JSON.stringify(data))
@@ -45,7 +45,7 @@ serve(async (req: Request) => {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: 'BudMatch <hello@budmatch.site>', to, subject, html }),
+    body: JSON.stringify({ from: 'BudMatch <noreply@budmatch.site>', reply_to: 'hello@budmatch.site', to, subject, html }),
   })
   const data = await res.json()
   console.log('Notification email response:', JSON.stringify(data))
